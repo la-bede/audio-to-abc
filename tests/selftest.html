@@ -22,12 +22,15 @@
     import { detectKey } from '../js/key.js';
     import { renderBars, layoutLinear } from '../js/abc.js';
     import { simplify, layoutSimplified } from '../js/structure.js';
+    import { getLang, setLang } from '../js/i18n.js';
 
     const out = document.getElementById('out');
     const report = location.search.includes('report');
     const debug = location.search.includes('debug');
     const log = (s) => { out.textContent += '\n' + s; };
     out.textContent = '';
+    const initialLang = getLang();
+    setLang('en'); // résumés vérifiés en anglais (langue par défaut), puis en français
     let allOk = true;
     const check = (name, got, expected) => {
       const ok = got === expected;
@@ -57,13 +60,21 @@
     check('volta sur 4 mesures', body([...A, ...alt(A, [4, 5, 6, 7])]).abc,
       '|:A1|A2|A3|A4|\n[1 A5|A6|A7|A8:|\n[2 X5|X6|X7|X8|]');
     check('5 mesures différentes → pas de reprise', body([...A, ...alt(A, [3, 4, 5, 6, 7])]).summary,
-      'Aucune répétition trouvée.');
+      'No repetition found.');
     const tour = body([...A, ...A, ...B, ...B, ...A, ...A, ...B, ...B]);
     check('AABB AABB → un seul tour', tour.abc, '|:A1|A2|A3|A4|\nA5|A6|A7|A8:|\n|:B1|B2|B3|B4|\nB5|B6|B7|B8:|');
-    check('AABB AABB → résumé', tour.summary,
+    check('AABB AABB → résumé (EN)', tour.summary,
+      'Parts of 8 bars · A: exact repeat · B: exact repeat · 2 rounds detected, 1 kept');
+    setLang('fr');
+    check('AABB AABB → résumé (FR)', body([...A, ...A, ...B, ...B, ...A, ...A, ...B, ...B]).summary,
       'Parties de 8 mesures · A : reprise exacte · B : reprise exacte · 2 tours détectés, 1 conservé');
+    check('voltas → résumé (FR)', body([...A, ...alt(A, [6, 7])]).summary,
+      'Parties de 8 mesures · A : reprise avec voltas (2 mesures)');
+    check('aucune répétition → résumé (FR)', body([...A, ...alt(A, [3, 4, 5, 6, 7])]).summary, 'Aucune répétition trouvée.');
+    setLang('en');
+    check('voltas → résumé (EN)', body([...A, ...alt(A, [7])]).summary, 'Parts of 8 bars · A: repeat with 1-bar endings');
     check('levée devant |:', body([...A, ...A], 'P').abc, 'P|:A1|A2|A3|A4|\nA5|A6|A7|A8:|');
-    check('variation au milieu, sans tolérance', body([...A, ...alt(A, [2])]).summary, 'Aucune répétition trouvée.');
+    check('variation au milieu, sans tolérance', body([...A, ...alt(A, [2])]).summary, 'No repetition found.');
     check('variation au milieu, tolérance 1', body([...A, ...alt(A, [2])], null, 1).abc, '|:A1|A2|A3|A4|\nA5|A6|A7|A8:|');
     check('A non répété puis BB', body([...A, ...B, ...B]).abc,
       'A1|A2|A3|A4|\nA5|A6|A7|A8\n|:B1|B2|B3|B4|\nB5|B6|B7|B8:|');
@@ -171,6 +182,7 @@
       allOk = false;
       log('ERREUR : ' + (err.stack || err));
     }
+    setLang(initialLang); // rétablit le choix de langue du visiteur
     log(allOk ? '\nFIN : TOUS LES TESTS OK' : '\nFIN : ÉCHEC');
     document.title = allOk ? 'PASS' : 'FAIL';
     if (report) fetch('/__log', { method: 'POST', body: out.textContent }).catch(() => {});

@@ -5,6 +5,8 @@
 // - si l'air entier est joué plusieurs fois, un seul tour est conservé.
 // Les mesures sont comparées sous forme de chaînes ABC (cf. renderBars dans abc.js).
 
+import { t } from './i18n.js';
+
 const VOLTA_LENGTHS = [1, 2, 4];
 const PART_LENGTHS = [8, 16, 4]; // à égalité de gain, l'ordre donne la préférence
 
@@ -103,18 +105,18 @@ export function simplify(bars, opts = {}) {
   }
   if (!best || best.saved === 0) {
     return { sections: [{ type: 'plain', body: bars.slice() }], partLength: null, tours: 1, repeated: false,
-      summary: 'Aucune répétition trouvée.' };
+      summary: t('struct.none') };
   }
   const { sections, tours } = keepOneTour(best.sections, tolerance);
   const names = 'ABCDEFGHIJ';
   let letter = 0;
   const parts = sections.map((s) => {
     const name = names[letter++] || '?';
-    if (s.type === 'repeat') return `${name} : reprise exacte`;
-    if (s.type === 'volta') return `${name} : reprise avec voltas (${s.end1.length} mesure${s.end1.length > 1 ? 's' : ''})`;
-    return `${name} : ${s.body.length} mesure${s.body.length > 1 ? 's' : ''} sans reprise`;
+    if (s.type === 'repeat') return t('struct.exact', { p: name });
+    if (s.type === 'volta') return t(s.end1.length > 1 ? 'struct.volta' : 'struct.volta1', { p: name, n: s.end1.length });
+    return t(s.body.length > 1 ? 'struct.plain' : 'struct.plain1', { p: name, n: s.body.length });
   });
-  const summary = [`Parties de ${best.P} mesures`, ...parts, tours > 1 ? `${tours} tours détectés, 1 conservé` : null]
+  const summary = [t('struct.parts', { n: best.P }), ...parts, tours > 1 ? t('struct.tours', { n: tours }) : null]
     .filter(Boolean).join(' · ');
   return { sections, partLength: best.P, tours, repeated: true, summary };
 }

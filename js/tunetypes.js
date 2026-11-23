@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 // Types d'airs de thesession.org → métrique (M:), note de base (L:), pulsation et tempo par défaut.
 // beat = durée d'une pulsation du métronome en fraction de ronde (1/2 = blanche, 1/4 = noire, 3/8 = noire pointée).
 // group = taille (en unités L) des groupes de notes séparés par une espace dans l'ABC.
@@ -15,7 +17,7 @@ export const TUNE_TYPES = {
   'three-two': { label: 'Three-two',   M: '3/2', L: '1/8', beat: 1 / 2, bpm: 80,  group: 4 },
   mazurka:     { label: 'Mazurka',     M: '3/4', L: '1/8', beat: 1 / 4, bpm: 120, group: 2 },
   march:       { label: 'March',       M: '2/4', L: '1/8', beat: 1 / 4, bpm: 100, group: 2 },
-  custom:      { label: 'Perso…',      M: '4/4', L: '1/8', beat: 1 / 4, bpm: 100, group: 4 },
+  custom:      { labelKey: 'type.custom',      M: '4/4', L: '1/8', beat: 1 / 4, bpm: 100, group: 4 },
 };
 
 export function parseFraction(str) {
@@ -39,30 +41,32 @@ export function defaultGroup(meter, unitL) {
   return Math.max(1, g);
 }
 
+// Libellé d'un type d'air (les noms thesession restent en anglais).
+export function tuneTypeLabel(id) {
+  const tt = TUNE_TYPES[id];
+  return tt.labelKey ? t(tt.labelKey) : tt.label;
+}
+
 export function beatSymbol(beat) {
-  if (Math.abs(beat - 1 / 2) < 1e-9) return 'blanche';
-  if (Math.abs(beat - 3 / 8) < 1e-9) return '♩.';
-  if (Math.abs(beat - 1 / 4) < 1e-9) return '♩';
-  if (Math.abs(beat - 1 / 8) < 1e-9) return '♪';
-  if (Math.abs(beat - 3 / 4) < 1e-9) return 'blanche pointée';
-  return `1/${Math.round(1 / beat)}`;
+  const b = BEAT_CHOICES.find(c => Math.abs(c.value - beat) < 1e-9);
+  return b ? t(b.labelKey) : `1/${Math.round(1 / beat)}`;
 }
 
 export const BEAT_CHOICES = [
-  { value: 1 / 2, label: 'blanche' },
-  { value: 3 / 4, label: 'blanche pointée' },
-  { value: 1 / 4, label: 'noire' },
-  { value: 3 / 8, label: 'noire pointée' },
-  { value: 1 / 8, label: 'croche' },
+  { value: 1 / 2, labelKey: 'beat.half' },
+  { value: 3 / 4, labelKey: 'beat.dottedHalf' },
+  { value: 1 / 4, labelKey: 'beat.quarter' },
+  { value: 3 / 8, labelKey: 'beat.dottedQuarter' },
+  { value: 1 / 8, labelKey: 'beat.eighth' },
 ];
 
 // Plages de hauteurs (MIDI) par instrument, pour filtrer harmoniques et clics du métronome.
 export const INSTRUMENTS = {
-  generic:   { label: 'Générique',              min: 50, max: 90 },
-  whistle:   { label: 'Flûte / tin whistle (D)', min: 59, max: 90 },
-  fiddle:    { label: 'Violon',                 min: 55, max: 90 },
-  accordion: { label: 'Accordéon / concertina',  min: 52, max: 90 },
-  banjo:     { label: 'Banjo / mandoline',       min: 55, max: 88 },
-  pipes:     { label: 'Uilleann pipes',          min: 62, max: 88 },
-  voice:     { label: 'Voix',                    min: 45, max: 81 },
+  generic:   { labelKey: 'ins.generic',   min: 50, max: 90 },
+  whistle:   { labelKey: 'ins.whistle',   min: 59, max: 90 },
+  fiddle:    { labelKey: 'ins.fiddle',    min: 55, max: 90 },
+  accordion: { labelKey: 'ins.accordion', min: 52, max: 90 },
+  banjo:     { labelKey: 'ins.banjo',     min: 55, max: 88 },
+  pipes:     { labelKey: 'ins.pipes',     min: 62, max: 88 },
+  voice:     { labelKey: 'ins.voice',     min: 45, max: 81 },
 };

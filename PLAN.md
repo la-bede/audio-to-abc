@@ -126,3 +126,41 @@ La v1 (`c:\Users\jerem\Desktop\Audio_to_ABC`) fonctionne. Demandes : (1) arrêt 
 3. **Deux enregistrements successifs** dans `recordtest.html` sans erreur ni rechargement.
 4. **Responsive** : captures Chrome headless `--window-size=1440,900` et `390,844` (`--screenshot`) relues pour contrôler les deux mises en page.
 5. Test manuel par l'utilisateur sur PC, puis sur Android après déploiement.
+
+---
+
+# Plan v3 (itération 3) — Page bilingue (anglais par défaut / français) + README anglais puis français
+
+## Contexte
+La page https://la-bede.github.io/audio-to-abc/ est entièrement en français. Demande : anglais par défaut, choix du français, choix mémorisé par le navigateur ; README rédigé d'abord en anglais puis en français.
+
+## Approche (sans dépendance, pas de build)
+**Nouveau `js/i18n.js`**
+- Dictionnaires `en` et `fr` (clé → texte), fonction `t(key, vars)` avec interpolation (`{n}`, `{key}`…), `getLang()`, `setLang(lang)`, `applyStatic(root)`.
+- Langue : `localStorage['audio2abc.lang']` (lu/écrit dans try/catch) ; **défaut `en`** quel que soit le navigateur. `<html lang>` mis à jour.
+
+**`index.html`**
+- Textes statiques balisés `data-i18n="clé"` (contenu) / `data-i18n-attr="aria-label:clé"` ; le texte anglais est écrit en dur (affichage correct même avant le JS).
+- Sélecteur de langue dans l'en-tête : deux boutons compacts **EN | FR** (état actif visible, cibles ≥ 44 px sur mobile).
+
+**Textes dynamiques passés par `t()`**
+- `js/main.js` : statut du modèle, libellés du bouton (Record / Stop / Analysing… / New transcription), Simplify / Linear version, infos (notes, latence, recalage, levée, analyse, arrêt auto), tonalité détectée/imposée, position (Ready… / Count-in n / Bar n), erreurs micro, résumé des réglages, optgroups des modes, bouton Copy/Copied.
+- `js/tunetypes.js` : libellés instruments, pulsations (half note / dotted quarter…), « Custom… » → clés i18n (les noms de types thesession reel, jig… restent tels quels).
+- `js/structure.js` : `summary` construit via `t()` (Parts of 8 bars · A: exact repeat · …).
+- Les noms de tonalités (`Dmajor`, `Ador`…) et l'ABC restent au format thesession, indépendants de la langue.
+- Changement de langue : `applyStatic`, reconstruction des listes déroulantes (valeurs conservées), `updateSummary()`, `regenerate()` si une transcription existe.
+
+**Tests**
+- `tests/recordtest.html` ne dépendra plus des libellés : `main.js` expose l'état dans `document.body.dataset.state` (`idle|recording|stopping|done`) ; le test l'utilise et vérifie aussi la bascule EN → FR → EN et la persistance (rechargement de l'iframe).
+- `tests/selftest.html` : vérifie le résumé de simplification dans les deux langues.
+
+**README.md** : section **English** complète (description, usage, simplification, desktop/mobile, local run, tests, hosting, structure, limits), puis séparateur et section **Français** (contenu actuel), avec liens d'ancre en tête (`English | Français`).
+
+## Fichiers
+Nouveau : `js/i18n.js`. Modifiés : `index.html`, `css/style.css` (sélecteur), `js/main.js`, `js/tunetypes.js`, `js/structure.js`, `tests/selftest.html`, `tests/recordtest.html`, `README.md`.
+
+## Vérification
+1. Self-test (Chrome headless + serveur de log) : 24 tests existants + résumés EN/FR.
+2. recordtest : 2 enregistrements, Simplify, bascule de langue, persistance après rechargement, aucune erreur JS.
+3. Captures bureau (1440 px) et mobile (`tests/mobile-preview.html`, 390 px) en EN et en FR : aucun texte français résiduel en mode EN, pas de débordement.
+4. Commit + push sur `main` (avec ton accord, comme les fois précédentes), contrôle que la version en ligne s'affiche en anglais par défaut.

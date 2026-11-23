@@ -1,6 +1,7 @@
 // Orchestration : réglages → métronome + micro → Basic Pitch → quantification → ABC → partition.
 
-import { TUNE_TYPES, INSTRUMENTS, BEAT_CHOICES, parseFraction, defaultBeat, defaultGroup, beatSymbol } from './tunetypes.js';
+import { TUNE_TYPES, INSTRUMENTS, BEAT_CHOICES, parseFraction, defaultBeat, defaultGroup, beatSymbol, tuneTypeLabel } from './tunetypes.js';
+import { t, getLang, setLang, applyStatic } from './i18n.js';
 import { Metronome } from './metronome.js';
 import { Recorder } from './recorder.js';
 import { Transcriber } from './transcriber.js';
@@ -12,7 +13,7 @@ import { simplify, layoutSimplified } from './structure.js';
 const $ = (id) => document.getElementById(id);
 const el = {
   status: $('status'), title: $('title'), tuneType: $('tuneType'), meter: $('meter'), unitL: $('unitL'),
-  keySelect: $('keySelect'), bpm: $('bpm'), bpmRange: $('bpmRange'), beat: $('beat'), beatSym: $('beatSym'),
+  keySelect: $('keySelect'), bpm: $('bpm'), bpmRange: $('bpmRange'), beat: $('beat'), tempoLabel: $('tempoLabel'),
   countIn: $('countIn'), pickup: $('pickup'), clickMode: $('clickMode'), instrument: $('instrument'),
   noteSens: $('noteSens'), splitSens: $('splitSens'), minNote: $('minNote'), latency: $('latency'),
   grid: $('grid'), barsPerLine: $('barsPerLine'), autoAlign: $('autoAlign'), melodia: $('melodia'),
@@ -33,24 +34,70 @@ let pollTimer = null, rafId = null, wakeLock = null;
 let synthControl = null, renderTimer = null, lastRendered = '';
 let simplified = false;   // affichage de la version simplifiée (reprises / voltas)
 let audioUrl = null;      // URL objet de l'enregistrement courant
-let stopReason = '';
+let stopReason = null;     // { key, vars } : raison de l'arrêt automatique
+let statusMsg = { key: 'status.loading' };
+let infoMsg = null;       // message hors transcription (erreur micro, métrique invalide)
 const desktop = window.matchMedia('(min-width: 1024px)');
 
 // ---------------------------------------------------------------------------------------------
 // Remplissage des listes
-for (const [id, t] of Object.entries(TUNE_TYPES)) el.tuneType.add(new Option(t.label, id));
-for (const [id, ins] of Object.entries(INSTRUMENTS)) el.instrument.add(new Option(ins.label, id));
-for (const b of BEAT_CHOICES) el.beat.add(new Option(b.label, String(b.value)));
+for (const id of Object.keys(TUNE_TYPES)) el.tuneType.add(new Option('', id));
+for (const id of Object.keys(INSTRUMENTS)) el.instrument.add(new Option('', id));
+for (const b of BEAT_CHOICES) el.beat.add(new Option('', String(b.value)));
 
 const FIFTHS_ORDER = [2, 7, 9, 4, 0, 5, 11, 10, 3, 6, 1, 8];
-const MODE_LABELS = { major: 'Majeur', minor: 'Mineur', dorian: 'Dorien', mixolydian: 'Mixolydien' };
-for (const mode of Object.keys(MODE_LABELS)) {
+const MODES = ['major', 'minor', 'dorian', 'mixolydian'];
+for (const mode of MODES) {
   const g = document.createElement('optgroup');
-  g.label = MODE_LABELS[mode];
+  g.dataset.mode = mode;
   const keys = allKeys().filter(k => k.mode === mode)
     .sort((a, b) => FIFTHS_ORDER.indexOf(a.tonicPc) - FIFTHS_ORDER.indexOf(b.tonicPc));
   for (const k of keys) g.appendChild(new Option(k.session, k.id));
   el.keySelect.appendChild(g);
+}
+
+// Textes dépendant de la langue (les valeurs sélectionnées ne changent pas).
+function translateUi() {
+  applyStatic();
+  for (const o of el.tuneType.options) o.textContent = tuneTypeLabel(o.value);
+  for (const o of el.instrument.options) o.textContent = t(INSTRUMENTS[o.value].labelKey);
+  BEAT_CHOICES.forEach((b, i) => { el.beat.options[i].textContent = t(b.labelKey); });
+  for (const g of el.keySelect.querySelectorAll('optgroup')) g.label = t(`mode.${g.dataset.mode}`);
+  for (const o of el.pickup.options) {
+    o.textContent = o.value === 'auto' ? t('f.pickupAuto') : o.value === '0' ? t('f.pickupNone') : t('f.pickupN', { n: o.value });
+  }
+  for (const o of el.autoStop.options) {
+    const n = Number(o.value);
+    o.textContent = n === 0 ? t('f.autoStopOff') : t(n === 1 ? 'f.autoStopN1' : 'f.autoStopN', { n });
+  }
+  for (const b of document.querySelectorAll('.lang-switch .lang')) {
+    const on = b.dataset.lang === getLang();
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', String(on));
+  }
+  refreshBeatUi();
+  updateRecordLabel();
+  updateSimplifyButton();
+  renderStatus();
+  updateSummary();
+  if (session) regenerate();
+  else el.info.textContent = infoMsg ? t(infoMsg.key, infoMsg.vars) : '';
+}
+
+function setStatus(key, vars) { statusMsg = { key, vars }; renderStatus(); }
+function renderStatus() { el.status.textContent = t(statusMsg.key, statusMsg.vars); }
+function setInfo(key, vars) { infoMsg = { key, vars }; el.info.textContent = t(key, vars); }
+
+// Libellé du bouton principal selon l'état.
+function updateRecordLabel() {
+  el.recordLabel.textContent = t(state === 'recording' ? 'rec.stop'
+    : state === 'stopping' && session ? 'rec.analysing'
+      : session?.final ? 'rec.new' : 'rec.record');
+  document.body.dataset.state = state === 'idle' && session?.final ? 'done' : state;
+}
+
+for (const b of document.querySelectorAll('.lang-switch .lang')) {
+  b.addEventListener('click', () => { setLang(b.dataset.lang); translateUi(); });
 }
 
 if (!window.isSecureContext) $('secureWarning').hidden = false;
@@ -84,7 +131,7 @@ function setBpm(v) {
 }
 
 function refreshBeatUi() {
-  el.beatSym.textContent = beatSymbol(Number(el.beat.value));
+  el.tempoLabel.textContent = t('f.tempo', { beat: beatSymbol(Number(el.beat.value)) });
   const s = readSettings();
   el.beats.innerHTML = '';
   for (let i = 0; i < (s ? s.beatsPerBar : 0); i++) {
@@ -114,7 +161,7 @@ function readSettings() {
     beat, beatsPerBar, bpm: Number(el.bpm.value),
     countInBars: Number(el.countIn.value), pickup: el.pickup.value, clickMode: el.clickMode.value,
     gridDiv, barSteps: Math.round(unitsPerBar * gridDiv), groupSteps: Math.max(1, Math.round(groupUnits * gridDiv)),
-    barsPerLine: Number(el.barsPerLine.value), keyId: el.keySelect.value, title: el.title.value.trim(),
+    barsPerLine: Number(el.barsPerLine.value), keyId: el.keySelect.value, title: el.title.value.trim() || t('untitled'),
     autoStopBars: Number(el.autoStop.value), tolerance: el.tolerance.checked ? 1 : 0,
     autoAlign: el.autoAlign.checked, extraLatency: Number(el.latency.value) / 1000,
     detect: {
@@ -140,6 +187,8 @@ function loadSettings() {
     const o = JSON.parse(localStorage.getItem('audio2abc.settings') || 'null');
     if (!o) return false;
     for (const k of PERSIST) if (k in o) { if (el[k].type === 'checkbox') el[k].checked = o[k]; else el[k].value = o[k]; }
+    // Ancien titre par défaut : remplacé par le libellé traduit (champ vide).
+    if (['Sans titre', 'Untitled'].includes(el.title.value)) el.title.value = '';
     return true;
   } catch (_) { return false; }
 }
@@ -148,8 +197,8 @@ function loadSettings() {
 function updateSummary() {
   const s = readSettings();
   if (!s) return;
-  const type = TUNE_TYPES[s.typeId].label.replace('…', '');
-  const key = s.keyId === 'auto' ? 'tonalité auto' : keyFromId(s.keyId).session;
+  const type = tuneTypeLabel(s.typeId).replace('…', '');
+  const key = s.keyId === 'auto' ? t('summary.autoKey') : keyFromId(s.keyId).session;
   el.settingsSummary.textContent = `${type} · ${s.M} · ${beatSymbol(s.beat)} = ${s.bpm} · ${key}`;
 }
 
@@ -191,26 +240,27 @@ function onSettingsChanged(kind) {
 
 el.abcText.addEventListener('input', () => scheduleRender(el.abcText.value));
 el.copyBtn.addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(el.abcText.value); flash(el.copyBtn, 'Copié ✓'); }
-  catch (_) { el.abcText.select(); document.execCommand('copy'); flash(el.copyBtn, 'Copié ✓'); }
+  try { await navigator.clipboard.writeText(el.abcText.value); flash(el.copyBtn, t('out.copied')); }
+  catch (_) { el.abcText.select(); document.execCommand('copy'); flash(el.copyBtn, t('out.copied')); }
 });
 el.downloadAbcBtn.addEventListener('click', () => {
   const name = (readSettings()?.title || 'transcription').replace(/[^\w\- ]+/g, '').trim() || 'transcription';
   downloadBlob(new Blob([el.abcText.value], { type: 'text/vnd.abc;charset=utf-8' }), `${name}.abc`);
 });
-el.recordBtn.addEventListener('click', () => { if (state === 'idle') startRecording(); else if (state === 'recording') stopRecording('manuel'); });
+el.recordBtn.addEventListener('click', () => { if (state === 'idle') startRecording(); else if (state === 'recording') stopRecording(null); });
 el.simplifyBtn.addEventListener('click', () => {
   simplified = !simplified;
   updateSimplifyButton();
   regenerate();
 });
 function updateSimplifyButton() {
-  el.simplifyBtn.textContent = simplified ? 'Version linéaire' : 'Simplifier (reprises)';
+  el.simplifyBtn.textContent = t(simplified ? 'out.linear' : 'out.simplify');
   el.simplifyBtn.classList.toggle('active', simplified);
 }
 
 function flash(btn, text) {
-  const old = btn.textContent; btn.textContent = text; setTimeout(() => { btn.textContent = old; }, 1200);
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = t('out.copy'); }, 1200);
 }
 function downloadBlob(blob, name) {
   const a = document.createElement('a');
@@ -222,7 +272,7 @@ function downloadBlob(blob, name) {
 // Enregistrement
 async function startRecording() {
   const s = readSettings();
-  if (!s) { el.info.textContent = 'Métrique ou note de base invalide (format attendu : 6/8).'; return; }
+  if (!s) { setInfo('info.badMeter'); return; }
   try {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -240,7 +290,8 @@ async function startRecording() {
     console.error(err);
     state = 'idle';
     el.recordBtn.disabled = false;
-    el.info.textContent = `Micro inaccessible : ${err.message || err}`;
+    updateRecordLabel();
+    setInfo('info.micError', { err: err.message || err });
     return;
   }
 
@@ -254,7 +305,7 @@ async function startRecording() {
   state = 'recording';
   el.recordBtn.disabled = false;
   el.recordBtn.classList.add('recording');
-  el.recordLabel.textContent = 'Arrêter';
+  updateRecordLabel();
   setSettingsLocked(true);
   try { wakeLock = await navigator.wakeLock?.request('screen'); } catch (_) { wakeLock = null; }
 
@@ -271,7 +322,8 @@ async function startRecording() {
         t0: session.t0, barSec, bars: st.autoStopBars, latency: session.latency + st.extraLatency,
       });
       if (auto.stop && state === 'recording') {
-        stopRecording(`arrêt automatique après ${st.autoStopBars} mesure${st.autoStopBars > 1 ? 's' : ''} sans note`);
+        const n = st.autoStopBars;
+        stopRecording({ key: n > 1 ? 'info.autoStopped' : 'info.autoStopped1', vars: { n } });
       }
     }
   }, 250);
@@ -283,7 +335,9 @@ function resetOutput() {
   transcriber.reset();
   notes = [];
   simplified = false;
-  stopReason = '';
+  stopReason = null;
+  infoMsg = null;
+  session = null;
   updateSimplifyButton();
   el.simplifyBtn.hidden = true;
   el.structureBox.hidden = true;
@@ -299,12 +353,12 @@ function resetOutput() {
   el.abcText.readOnly = true;
 }
 
-async function stopRecording(reason = '') {
+async function stopRecording(reason = null) {
   if (state !== 'recording') return;
   state = 'stopping';
-  stopReason = reason === 'manuel' ? '' : reason;
+  stopReason = reason;
   el.recordBtn.disabled = true;
-  el.recordLabel.textContent = 'Analyse…';
+  updateRecordLabel();
   clearInterval(pollTimer);
   metronome.stop();
   const blob = await recorder.stop();
@@ -322,13 +376,13 @@ async function stopRecording(reason = '') {
     el.recAudio.src = audioUrl;
     el.downloadAudio.href = audioUrl;
     const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
-    el.downloadAudio.download = `enregistrement.${ext}`;
+    el.downloadAudio.download = `${t('file.recording')}.${ext}`;
     el.recordingBox.hidden = false;
   }
   state = 'idle';
   el.recordBtn.disabled = false;
   el.recordBtn.classList.remove('recording');
-  el.recordLabel.textContent = 'Nouvelle transcription';
+  updateRecordLabel();
   el.position.textContent = '—';
   el.simplifyBtn.hidden = false;
   el.abcText.readOnly = false;
@@ -363,16 +417,16 @@ function regenerate() {
   let key;
   if (s.keyId !== 'auto') {
     key = keyFromId(s.keyId);
-    el.keyInfo.textContent = `Tonalité imposée : ${key.session}`;
+    el.keyInfo.textContent = t('key.forced', { key: key.session });
   } else {
     const last = [...q.events].reverse().find(e => e.midi != null);
     key = detectKey(q.events, { finalPc: session.final && last ? last.midi % 12 : undefined });
     if (key) {
-      const conf = key.margin > 0.08 ? 'nette' : key.margin > 0.03 ? 'probable' : 'incertaine';
-      el.keyInfo.textContent = `Tonalité détectée : ${key.session} (${conf}) — autres possibilités : ${key.alternatives.join(', ')}`;
+      const conf = t(key.margin > 0.08 ? 'key.conf.clear' : key.margin > 0.03 ? 'key.conf.likely' : 'key.conf.uncertain');
+      el.keyInfo.textContent = t('key.detected', { key: key.session, conf, alt: key.alternatives.join(', ') });
     } else {
       key = makeKey(2, 'major');
-      el.keyInfo.textContent = 'Tonalité : en attente de notes (Dmajor par défaut)';
+      el.keyInfo.textContent = t('key.waiting');
     }
   }
   const r = renderBars({
@@ -392,13 +446,13 @@ function regenerate() {
   el.abcText.value = abc;
   const lag = transcriber.backlogSec();
   const parts = [
-    `${q.noteCount} notes`,
-    `latence compensée ${Math.round((session.latency + s.extraLatency) * 1000)} ms`,
-    s.autoAlign ? `recalage ${q.shiftMs >= 0 ? '+' : ''}${q.shiftMs} ms` : null,
-    q.pickupSteps ? `levée ${q.pickupSteps / s.gridDiv} × L` : 'pas de levée',
-    state === 'recording' ? `analyse : ${transcriber.lastInferMs.toFixed(0)} ms / fenêtre, retard ${lag.toFixed(1)} s` : null,
-    `moteur ${transcriber.backend}`,
-    session.final && stopReason ? stopReason : null,
+    t('info.notes', { n: q.noteCount }),
+    t('info.latency', { ms: Math.round((session.latency + s.extraLatency) * 1000) }),
+    s.autoAlign ? t('info.shift', { ms: `${q.shiftMs >= 0 ? '+' : ''}${q.shiftMs}` }) : null,
+    q.pickupSteps ? t('info.pickup', { n: q.pickupSteps / s.gridDiv }) : t('info.noPickup'),
+    state === 'recording' ? t('info.analysis', { ms: transcriber.lastInferMs.toFixed(0), lag: lag.toFixed(1) }) : null,
+    t('info.engine', { b: transcriber.backend }),
+    session.final && stopReason ? t(stopReason.key, stopReason.vars) : null,
   ].filter(Boolean);
   el.info.textContent = parts.join(' · ');
   scheduleRender(abc);
@@ -446,14 +500,16 @@ function animate() {
   const beatIdx = ((Math.floor(pos) % beatsPerBar) + beatsPerBar) % beatsPerBar;
   const frac = pos - Math.floor(pos);
   [...el.beats.children].forEach((b, i) => b.classList.toggle('on', i === beatIdx && frac < 0.35 && now >= metronome.startTime));
-  if (now < metronome.startTime) el.position.textContent = 'Prêt…';
-  else if (pos < 0) el.position.textContent = `Décompte ${Math.ceil(-pos / beatsPerBar)}`;
-  else el.position.textContent = `Mesure ${Math.floor(pos / beatsPerBar) + 1}`;
+  if (now < metronome.startTime) el.position.textContent = t('pos.ready');
+  else if (pos < 0) el.position.textContent = t('pos.countIn', { n: Math.ceil(-pos / beatsPerBar) });
+  else el.position.textContent = t('pos.bar', { n: Math.floor(pos / beatsPerBar) + 1 });
   el.levelBar.style.width = `${Math.min(100, Math.round(Math.sqrt(recorder.peak) * 100))}%`;
 }
 
 // ---------------------------------------------------------------------------------------------
 // Initialisation
+setLang(getLang());
+translateUi();
 if (!loadSettings()) { el.tuneType.value = 'reel'; applyTuneType(); }
 applyTuneTypeLockState();
 setBpm(el.bpm.value);
@@ -462,19 +518,20 @@ $('noteSensOut').textContent = Number(el.noteSens.value).toFixed(2);
 $('splitSensOut').textContent = Number(el.splitSens.value).toFixed(2);
 $('minNoteOut').textContent = `${el.minNote.value} ms`;
 $('latencyOut').textContent = `${el.latency.value} ms`;
-updateSummary();
+translateUi();
 syncPanel();
-el.abcText.value = 'X: 1\nT: Sans titre\nR: reel\nM: 4/4\nL: 1/8\nK: Dmaj\n';
+el.abcText.value = `X: 1\nT: ${t('untitled')}\nR: reel\nM: 4/4\nL: 1/8\nK: Dmaj\n`;
 
 (async () => {
   try {
     const url = new URL('../vendor/basic-pitch/model/model.json', import.meta.url).href;
-    const backend = await transcriber.load(url, (p) => { el.status.textContent = `Chargement du modèle Basic Pitch… ${Math.round(p * 100)} %`; });
-    el.status.textContent = `Modèle prêt (${backend === 'webgl' ? 'GPU / WebGL' : 'CPU — plus lent'}, préchauffage ${Math.round(transcriber.warmupMs)} ms).`;
+    const backend = await transcriber.load(url, (p) => setStatus('status.loadingPct', { pct: Math.round(p * 100) }));
+    setStatus('status.ready', { backend: t(backend === 'webgl' ? 'status.gpu' : 'status.cpu'), ms: Math.round(transcriber.warmupMs) });
     state = 'idle';
     el.recordBtn.disabled = false;
+    updateRecordLabel();
   } catch (err) {
     console.error(err);
-    el.status.textContent = `Échec du chargement du modèle : ${err.message || err}`;
+    setStatus('status.failed', { err: err.message || err });
   }
 })();

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -16,11 +16,15 @@
 <body>
   <header class="top">
     <h1>Audio <span aria-hidden="true">→</span> ABC</h1>
-    <p id="status" class="status">Chargement du modèle Basic Pitch…</p>
+    <p id="status" class="status">Loading the Basic Pitch model…</p>
+    <div class="lang-switch" role="group" aria-label="Language / Langue">
+      <button type="button" class="lang" data-lang="en" lang="en">EN</button>
+      <button type="button" class="lang" data-lang="fr" lang="fr">FR</button>
+    </div>
   </header>
 
-  <div id="secureWarning" class="warning wrap" hidden>
-    Cette page n'est pas servie en HTTPS (ni sur <code>localhost</code>) : le navigateur refusera l'accès au micro.
+  <div id="secureWarning" class="warning wrap" data-i18n-html="warn.insecure" hidden>
+    This page is not served over HTTPS (nor on <code>localhost</code>): the browser will refuse microphone access.
   </div>
 
   <main class="layout">
@@ -28,7 +32,7 @@
       <section class="card transport" id="transport">
         <div class="transport-row">
           <button id="recordBtn" class="rec" disabled>
-            <span class="dot" aria-hidden="true"></span><span id="recordLabel">Enregistrer</span>
+            <span class="dot" aria-hidden="true"></span><span id="recordLabel">Record</span>
           </button>
           <div class="beats" id="beats" aria-hidden="true"></div>
           <span id="position" class="position">—</span>
@@ -39,105 +43,105 @@
       <section class="card settings-card">
         <details id="settingsPanel" open>
           <summary>
-            <span class="summary-title">Réglages</span>
+            <span class="summary-title" data-i18n="settings">Settings</span>
             <span id="settingsSummary" class="summary-text"></span>
           </summary>
 
-          <h2>L'air</h2>
+          <h2 data-i18n="h.tune">The tune</h2>
           <div class="grid">
-            <label class="wide">Titre (T:)
-              <input id="title" type="text" value="Sans titre" autocomplete="off">
+            <label class="wide"><span data-i18n="f.title">Title (T:)</span>
+              <input id="title" type="text" value="" placeholder="Untitled" data-i18n-attr="placeholder:untitled" autocomplete="off">
             </label>
-            <label>Type
+            <label><span data-i18n="f.type">Type</span>
               <select id="tuneType"></select>
             </label>
-            <label>Métrique (M:)
+            <label><span data-i18n="f.meter">Meter (M:)</span>
               <input id="meter" type="text" inputmode="numeric" value="4/4" pattern="\d+/\d+">
             </label>
-            <label>Note de base (L:)
+            <label><span data-i18n="f.unit">Note length (L:)</span>
               <select id="unitL">
                 <option value="1/8">1/8</option>
                 <option value="1/4">1/4</option>
                 <option value="1/16">1/16</option>
               </select>
             </label>
-            <label>Tonalité (K:)
-              <select id="keySelect"><option value="auto">Auto (détection)</option></select>
+            <label><span data-i18n="f.key">Key (K:)</span>
+              <select id="keySelect"><option value="auto" data-i18n="f.keyAuto">Auto (detect)</option></select>
             </label>
           </div>
 
-          <h2>Métronome</h2>
+          <h2 data-i18n="h.metronome">Metronome</h2>
           <div class="grid">
-            <label><span>Tempo (<span id="beatSym" class="beat-sym">blanche</span>) =</span>
+            <label><span id="tempoLabel">Tempo (half note) =</span>
               <input id="bpm" type="number" min="30" max="240" step="1" value="90" inputmode="numeric">
             </label>
-            <label>Pulsation
+            <label><span data-i18n="f.beat">Beat</span>
               <select id="beat"></select>
             </label>
-            <label>Décompte (mesures)
+            <label><span data-i18n="f.countIn">Count-in (bars)</span>
               <select id="countIn">
                 <option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option>
               </select>
             </label>
-            <label>Levée
+            <label><span data-i18n="f.pickup">Pickup</span>
               <select id="pickup">
                 <option value="auto" selected>Auto</option>
-                <option value="0">Aucune</option>
-                <option value="1">1 unité L</option>
-                <option value="2">2 unités L</option>
-                <option value="3">3 unités L</option>
-                <option value="4">4 unités L</option>
+                <option value="0">None</option>
+                <option value="1">1 × L</option>
+                <option value="2">2 × L</option>
+                <option value="3">3 × L</option>
+                <option value="4">4 × L</option>
               </select>
             </label>
-            <label>Clic
+            <label><span data-i18n="f.click">Click</span>
               <select id="clickMode">
-                <option value="always" selected>Toujours (casque conseillé)</option>
-                <option value="countin">Décompte seulement</option>
-                <option value="off">Visuel seulement</option>
+                <option value="always" selected data-i18n="f.clickAlways">Always (headphones advised)</option>
+                <option value="countin" data-i18n="f.clickCountin">Count-in only</option>
+                <option value="off" data-i18n="f.clickOff">Visual only</option>
               </select>
             </label>
-            <label>Arrêt auto
+            <label><span data-i18n="f.autoStop">Auto stop</span>
               <select id="autoStop">
-                <option value="0">Désactivé</option>
-                <option value="1">après 1 mesure de silence</option>
-                <option value="2" selected>après 2 mesures de silence</option>
-                <option value="4">après 4 mesures de silence</option>
+                <option value="0">Off</option>
+                <option value="1">after 1 silent bar</option>
+                <option value="2" selected>after 2 silent bars</option>
+                <option value="4">after 4 silent bars</option>
               </select>
             </label>
-            <label>Instrument
+            <label><span data-i18n="f.instrument">Instrument</span>
               <select id="instrument"></select>
             </label>
           </div>
           <input id="bpmRange" type="range" min="30" max="240" step="1" value="90" aria-label="Tempo">
 
           <details class="advanced">
-            <summary>Réglages avancés (détection NeuralNote / Basic Pitch)</summary>
+            <summary data-i18n="f.advanced">Advanced settings (NeuralNote / Basic Pitch detection)</summary>
             <div class="grid">
-              <label><span>Sensibilité notes : <output id="noteSensOut">0.50</output></span>
+              <label><span><span data-i18n="f.noteSens">Note sensitivity:</span> <output id="noteSensOut">0.50</output></span>
                 <input id="noteSens" type="range" min="0.05" max="0.95" step="0.05" value="0.5">
               </label>
-              <label><span>Sensibilité séparation : <output id="splitSensOut">0.70</output></span>
+              <label><span><span data-i18n="f.splitSens">Split sensitivity:</span> <output id="splitSensOut">0.70</output></span>
                 <input id="splitSens" type="range" min="0.05" max="0.95" step="0.05" value="0.7">
               </label>
-              <label><span>Durée min. de note : <output id="minNoteOut">60 ms</output></span>
+              <label><span><span data-i18n="f.minNote">Min. note length:</span> <output id="minNoteOut">60 ms</output></span>
                 <input id="minNote" type="range" min="20" max="200" step="5" value="60">
               </label>
-              <label><span>Latence supplémentaire : <output id="latencyOut">0 ms</output></span>
+              <label><span><span data-i18n="f.latency">Extra latency:</span> <output id="latencyOut">0 ms</output></span>
                 <input id="latency" type="range" min="-250" max="250" step="5" value="0">
               </label>
-              <label>Grille rythmique
+              <label><span data-i18n="f.grid">Rhythmic grid</span>
                 <select id="grid">
-                  <option value="1" selected>= L (croches pour L:1/8)</option>
-                  <option value="2">L/2 (doubles croches)</option>
+                  <option value="1" selected data-i18n="f.grid1">= L (eighths for L:1/8)</option>
+                  <option value="2" data-i18n="f.grid2">L/2 (sixteenths)</option>
                 </select>
               </label>
-              <label>Mesures par ligne
+              <label><span data-i18n="f.barsPerLine">Bars per line</span>
                 <select id="barsPerLine">
                   <option>2</option><option selected>4</option><option>8</option>
                 </select>
               </label>
-              <label class="check"><input id="autoAlign" type="checkbox" checked> Recalage automatique sur la grille</label>
-              <label class="check"><input id="melodia" type="checkbox" checked> Notes liées sans attaque (« melodia trick »)</label>
+              <label class="check"><input id="autoAlign" type="checkbox" checked> <span data-i18n="f.autoAlign">Automatic alignment to the grid</span></label>
+              <label class="check"><input id="melodia" type="checkbox" checked> <span data-i18n="f.melodia">Slurred notes without attack (“melodia trick”)</span></label>
             </div>
           </details>
         </details>
@@ -150,8 +154,8 @@
         <div class="out-head">
           <h2>ABC</h2>
           <div class="buttons">
-            <button id="simplifyBtn" type="button" hidden>Simplifier (reprises)</button>
-            <button id="copyBtn" type="button">Copier</button>
+            <button id="simplifyBtn" type="button" hidden>Simplify (repeats)</button>
+            <button id="copyBtn" type="button" data-i18n="out.copy">Copy</button>
             <button id="downloadAbcBtn" type="button">.abc</button>
           </div>
         </div>
@@ -159,24 +163,24 @@
         <p id="keyInfo" class="info"></p>
         <div id="structureBox" class="structure" hidden>
           <p id="structureInfo" class="info"></p>
-          <label class="check"><input id="tolerance" type="checkbox"> Tolérance : 1 mesure différente admise hors fins de partie</label>
+          <label class="check"><input id="tolerance" type="checkbox"> <span data-i18n="out.tolerance">Tolerance: 1 differing bar allowed outside part endings</span></label>
         </div>
         <textarea id="abcText" spellcheck="false" rows="10" wrap="off" readonly></textarea>
         <div id="paper" class="paper"></div>
         <div id="synth" class="synth"></div>
 
         <div id="recordingBox" hidden>
-          <h2>Enregistrement</h2>
+          <h2 data-i18n="out.recording">Recording</h2>
           <audio id="recAudio" controls></audio>
-          <div class="buttons"><a id="downloadAudio" class="button" download="enregistrement">Télécharger l'audio</a></div>
+          <div class="buttons"><a id="downloadAudio" class="button" download="recording" data-i18n="out.downloadAudio">Download audio</a></div>
         </div>
       </section>
 
-      <footer class="foot">
-        Transcription : modèle <a href="https://github.com/spotify/basic-pitch">Basic Pitch</a> (moteur de
-        <a href="https://github.com/DamRsn/NeuralNote">NeuralNote</a>) · Partition : <a href="https://github.com/paulrosen/abcjs">abcjs</a> ·
-        ABC au format <a href="https://thesession.org">thesession.org</a> ·
-        Code source : <a href="https://github.com/la-bede/audio-to-abc">github.com/la-bede/audio-to-abc</a>
+      <footer class="foot" data-i18n-html="foot">
+        Transcription: <a href="https://github.com/spotify/basic-pitch">Basic Pitch</a> model (the engine of
+        <a href="https://github.com/DamRsn/NeuralNote">NeuralNote</a>) · Score: <a href="https://github.com/paulrosen/abcjs">abcjs</a> ·
+        ABC in <a href="https://thesession.org">thesession.org</a> style ·
+        Source code: <a href="https://github.com/la-bede/audio-to-abc">github.com/la-bede/audio-to-abc</a>
       </footer>
     </div>
   </main>
