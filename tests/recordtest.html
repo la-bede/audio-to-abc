@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex">
+  <title>Test enregistrement</title>
+</head>
+<body>
+  <!-- Pilote index.html dans un iframe : deux enregistrements successifs (sans recharger),
+       bouton Simplifier, contrôle de l'analyse ABC par abcjs.
+       À lancer avec Chrome --use-fake-device-for-media-stream --use-fake-ui-for-media-stream
+       --autoplay-policy=no-user-gesture-required (le faux micro émet un bip périodique). -->
+  <iframe id="app" src="../index.html" style="width:100%;height:90vh;border:0" allow="microphone"></iframe>
+  <script>
+    const lines = [];
+    const log = (s) => { lines.push(s); };
+    const send = () => fetch('/__log', { method: 'POST', body: lines.join('\n') }).catch(() => {});
+    const wait = (ms) => new Promise(r => setTimeout(r, ms));
+    document.getElementById('app').addEventListener('load', async () => {
+      const w = document.getElementById('app').contentWindow;
+      const d = w.document;
+      const errors = [];
+      w.addEventListener('error', (e) => errors.push('ERREUR app : ' + e.message));
+      w.addEventListener('unhandledrejection', (e) => errors.push('REJET app : ' + (e.reason && (e.reason.stack || e.reason))));
+      const $ = (id) => d.getElementById(id);
+      const btn = $('recordBtn');
+      for (let i = 0; i < 100 && btn.disabled; i++) await wait(200);
+      log('statut : ' + $('status').textContent);
+
+      for (let round = 1; round <= 2; round++) {
+        log(`\n--- Enregistrement ${round} (bouton : « ${$('recordLabel').textContent} ») ---`);
+        btn.click();
+        // Jusqu'à 8 s d'enregistrement ; l'arrêt automatique peut survenir avant (faux micro peu détecté).
+        let auto = false;
+        for (let i = 0; i < 40; i++) {
+          await wait(200);
+          if (i === 30) log('pendant : ' + $('position').textContent + ' | état bouton : ' + $('recordLabel').textContent);
+          if ($('recordLabel').textContent === 'Nouvelle transcription') { auto = true; break; }
+        }
+        if (!auto) btn.click();
+        log(auto ? 'arrêt automatique déclenché' : 'arrêt manuel');
+        for (let i = 0; i < 50 && $('recordLabel').textContent !== 'Nouvelle transcription'; i++) await wait(200);
+        await wait(500);
+        log('après : ' + $('info').textContent);
+        log('bouton : ' + $('recordLabel').textContent + ' | Simplifier visible : ' + !$('simplifyBtn').hidden);
+        log('ABC :\n' + $('abcText').value.trim());
+        $('simplifyBtn').click();
+        await wait(400);
+        log('simplifié : ' + $('structureInfo').textContent + ' | bouton : ' + $('simplifyBtn').textContent);
+        log('partition : ' + (d.querySelector('#paper svg') ? 'oui' : 'non') + ', lecteur : ' + (d.querySelector('#synth .abcjs-inline-audio') ? 'oui' : 'non') + ', audio : ' + !$('recordingBox').hidden);
+      }
+
+      // Vérifie qu'abcjs accepte la notation des voltas produite par la simplification.
+      const sample = 'X: 1\nT: t\nM: 4/4\nL: 1/8\nK: Dmaj\nA|:d2fd A2FA|dfed cABc|d2fd A2FA|1 BGFE D2FA:|2 BGFE D2A2||\n' +
+        '|:e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4|\n[1 A2FA dAFA|A2FA dAFA|A2FA dAFA|A2FA dAFA:|\n[2 A2FA dAFA|A2FA dAFA|A2FA dAFA|D8|]\n';
+      const parsed = w.ABCJS.parseOnly(sample)[0];
+      log('\nabcjs voltas : ' + (parsed.warnings && parsed.warnings.length ? parsed.warnings.join(' / ') : 'aucun avertissement'));
+      log(errors.length ? errors.join('\n') : 'aucune erreur JS');
+      log('FIN');
+      send();
+    });
+  </script>
+</body>
+</html>

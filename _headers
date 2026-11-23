@@ -1,0 +1,8 @@
+# En-têtes HTTP — lus par Netlify et Cloudflare Pages.
+/*
+  X-Robots-Tag: noindex, nofollow
+  Permissions-Policy: microphone=(self)
+  X-Content-Type-Options: nosniff
+
+/vendor/*
+  Cache-Control: public, max-age=604800

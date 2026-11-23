@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Autotest Audio → ABC</title>
+  <script type="importmap">
+    { "imports": { "@tensorflow/tfjs": "../vendor/tfjs/tf.fesm.min.js" } }
+  </script>
+  <style>body{font:14px system-ui;margin:16px;background:#fff;color:#111}pre{background:#f4f4f4;padding:10px;white-space:pre-wrap}</style>
+</head>
+<body>
+  <h1>Autotests Audio → ABC</h1>
+  <p>1) Tests unitaires de la simplification (reprises / voltas) et de l'arrêt automatique.
+     2) Mélodies synthétisées → Basic Pitch → ABC, comparées au résultat attendu. Aucun micro requis.
+     Ajouter <code>?debug</code> à l'URL pour afficher les notes brutes.</p>
+  <pre id="out">En cours…</pre>
+  <script type="module">
+    import { Transcriber } from '../js/transcriber.js';
+    import { quantize, shouldAutoStop } from '../js/quantize.js';
+    import { detectKey } from '../js/key.js';
+    import { renderBars, layoutLinear } from '../js/abc.js';
+    import { simplify, layoutSimplified } from '../js/structure.js';
+
+    const out = document.getElementById('out');
+    const report = location.search.includes('report');
+    const debug = location.search.includes('debug');
+    const log = (s) => { out.textContent += '\n' + s; };
+    out.textContent = '';
+    let allOk = true;
+    const check = (name, got, expected) => {
+      const ok = got === expected;
+      allOk = allOk && ok;
+      log(ok ? `OK     ${name}` : `ÉCART  ${name}\n  attendu : ${JSON.stringify(expected)}\n  obtenu  : ${JSON.stringify(got)}`);
+    };
+
+    // ---------------------------------------------------------------- 1. Tests unitaires
+    log('=== Simplification (chaînes de mesures) ===');
+    const part = (p, n = 8) => Array.from({ length: n }, (_, i) => `${p}${i + 1}`);
+    const body = (bars, pickup = null, tol = 0) => {
+      const res = simplify(bars, { tolerance: tol });
+      const abc = res.repeated ? layoutSimplified({ head: 'H', pickup, bars }, res, 4) : layoutLinear({ head: 'H', pickup, bars, lastComplete: true }, 4, true);
+      return { abc: abc.split('\n').slice(1).join('\n').trim(), summary: res.summary };
+    };
+    const A = part('A'), B = part('B');
+    const alt = (bars, idx, p = 'X') => bars.map((b, i) => (idx.includes(i) ? `${p}${i + 1}` : b));
+
+    check('AABB exact', body([...A, ...A, ...B, ...B]).abc,
+      '|:A1|A2|A3|A4|\nA5|A6|A7|A8:|\n|:B1|B2|B3|B4|\nB5|B6|B7|B8:|');
+    check('volta sur 1 mesure', body([...A, ...alt(A, [7])]).abc,
+      '|:A1|A2|A3|A4|\nA5|A6|A7|1 A8:|2 X8|]');
+    check('volta sur 2 mesures', body([...A, ...alt(A, [6, 7])]).abc,
+      '|:A1|A2|A3|A4|\nA5|A6|1 A7|A8:|2 X7|X8|]');
+    check('3 mesures différentes → voltas sur 4', body([...A, ...alt(A, [5, 6, 7])]).abc,
+      '|:A1|A2|A3|A4|\n[1 A5|A6|A7|A8:|\n[2 A5|X6|X7|X8|]');
+    check('volta sur 4 mesures', body([...A, ...alt(A, [4, 5, 6, 7])]).abc,
+      '|:A1|A2|A3|A4|\n[1 A5|A6|A7|A8:|\n[2 X5|X6|X7|X8|]');
+    check('5 mesures différentes → pas de reprise', body([...A, ...alt(A, [3, 4, 5, 6, 7])]).summary,
+      'Aucune répétition trouvée.');
+    const tour = body([...A, ...A, ...B, ...B, ...A, ...A, ...B, ...B]);
+    check('AABB AABB → un seul tour', tour.abc, '|:A1|A2|A3|A4|\nA5|A6|A7|A8:|\n|:B1|B2|B3|B4|\nB5|B6|B7|B8:|');
+    check('AABB AABB → résumé', tour.summary,
+      'Parties de 8 mesures · A : reprise exacte · B : reprise exacte · 2 tours détectés, 1 conservé');
+    check('levée devant |:', body([...A, ...A], 'P').abc, 'P|:A1|A2|A3|A4|\nA5|A6|A7|A8:|');
+    check('variation au milieu, sans tolérance', body([...A, ...alt(A, [2])]).summary, 'Aucune répétition trouvée.');
+    check('variation au milieu, tolérance 1', body([...A, ...alt(A, [2])], null, 1).abc, '|:A1|A2|A3|A4|\nA5|A6|A7|A8:|');
+    check('A non répété puis BB', body([...A, ...B, ...B]).abc,
+      'A1|A2|A3|A4|\nA5|A6|A7|A8\n|:B1|B2|B3|B4|\nB5|B6|B7|B8:|');
+
+    log('\n=== Arrêt automatique ===');
+    const n = (start, dur) => ({ start, dur, midi: 69, amp: 0.5 });
+    const base = { captureStart: 0, t0: 2, barSec: 2, bars: 2, latency: 0 };
+    check('silence de 2 mesures → arrêt', shouldAutoStop({ ...base, notes: [n(3, 2)], analyzedSec: 9 }).stop, true);
+    check('silence de 1,5 mesure → continue', shouldAutoStop({ ...base, notes: [n(3, 2)], analyzedSec: 8 }).stop, false);
+    check('aucune note → continue', shouldAutoStop({ ...base, notes: [], analyzedSec: 30 }).stop, false);
+    check('bruit avant le décompte ignoré', shouldAutoStop({ ...base, notes: [n(-1, 0.2)], analyzedSec: 30 }).stop, false);
+    check('arrêt auto désactivé', shouldAutoStop({ ...base, bars: 0, notes: [n(3, 2)], analyzedSec: 30 }).stop, false);
+
+    // ---------------------------------------------------------------- 2. Audio synthétisé
+    // (midi, durée en croches)
+    const bar1 = [[74, 2], [78, 1], [74, 1], [69, 2], [66, 1], [69, 1]];                 // d2fd A2FA
+    const bar2 = [[74, 1], [78, 1], [76, 1], [74, 1], [73, 1], [69, 1], [71, 1], [73, 1]]; // dfed cABc
+    const bar4a = [[71, 1], [67, 1], [66, 1], [64, 1], [62, 2], [66, 1], [69, 1]];        // BGFE D2FA
+    const bar4b = [[71, 1], [67, 1], [66, 1], [64, 1], [62, 2], [69, 2]];                 // BGFE D2A2
+    const bar5 = [[76, 2], [78, 1], [76, 1], [74, 2], [73, 1], [71, 1]];                  // e2fe d2cB
+    const bar6 = [[69, 1], [71, 1], [73, 1], [74, 1], [76, 4]];                           // ABcd e4
+    const bar8 = [[71, 1], [67, 1], [66, 1], [64, 1], [62, 4]];                           // BGFE D4
+    const CASES = [
+      {
+        name: 'Reel en ré (levée)', M: '4/4', rhythm: 'reel', eighth: 0.15, barSteps: 8, groupSteps: 4, keyAbc: 'Dmaj', pickupFirst: true,
+        tune: [[69, 1], ...bar1, ...bar2, ...bar1, [71, 1], [67, 1], [66, 1], [64, 1], [62, 4]],
+        expected: 'A|d2fd A2FA|dfed cABc|d2fd A2FA|BGFE D4|]',
+      },
+      {
+        name: 'Jig en sol (accidents)', M: '6/8', rhythm: 'jig', eighth: 0.2, barSteps: 6, groupSteps: 3, keyAbc: 'Gmaj', pickupFirst: true,
+        tune: [[62, 1], [67, 1], [69, 1], [71, 1], [72, 1], [73, 1], [74, 1], [76, 3], [74, 1], [71, 1], [67, 1],
+          [72, 1], [71, 1], [69, 1], [71, 1], [67, 1], [64, 1], [62, 1], [64, 1], [66, 1], [67, 3]],
+        expected: 'D|GAB c^cd|e3 dBG|cBA BGE|DEF G3|]',
+      },
+      {
+        name: 'Reel AABB (parties de 4 mesures) → simplification', M: '4/4', rhythm: 'reel', eighth: 0.15, barSteps: 8, groupSteps: 4, keyAbc: 'Dmaj',
+        tune: [...bar1, ...bar2, ...bar1, ...bar4a, ...bar1, ...bar2, ...bar1, ...bar4b,
+          ...bar5, ...bar6, ...bar5, ...bar8, ...bar5, ...bar6, ...bar5, ...bar8],
+        expected: 'd2fd A2FA|dfed cABc|d2fd A2FA|BGFE D2FA|d2fd A2FA|dfed cABc|d2fd A2FA|BGFE D2A2|'
+          + 'e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4|e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4|]',
+        simplified: '|:d2fd A2FA|dfed cABc|d2fd A2FA|1 BGFE D2FA:|2 BGFE D2A2||\n|:e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4:|',
+      },
+    ];
+    const t0 = 1.0;       // temps 1 de la mesure 1 dans le fichier
+    const SR = 22050;
+
+    async function synth(tune, eighth, pickupFirst) {
+      const total = t0 + tune.reduce((a, [, len]) => a + len, 0) * eighth + 1.0;
+      const oc = new OfflineAudioContext(1, Math.ceil(total * SR), SR);
+      let t = pickupFirst ? t0 - eighth : t0; // la levée commence une croche avant t0
+      for (const [midi, len] of tune) {
+        const f = 440 * 2 ** ((midi - 69) / 12);
+        const d = len * eighth;
+        const o = oc.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
+        const lp = oc.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500;
+        const g = oc.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.3, t + 0.01);
+        g.gain.setValueAtTime(0.3, t + d - 0.03);
+        g.gain.linearRampToValueAtTime(0, t + d - 0.005);
+        o.connect(lp).connect(g).connect(oc.destination);
+        o.start(t); o.stop(t + d);
+        t += d;
+      }
+      return (await oc.startRendering()).getChannelData(0);
+    }
+
+    try {
+      const tr = new Transcriber();
+      const backend = await tr.load(new URL('../vendor/basic-pitch/model/model.json', import.meta.url).href);
+      log(`\nMoteur : ${backend}, préchauffage ${tr.warmupMs.toFixed(0)} ms`);
+      const p = { noteSensitivity: 0.5, splitSensitivity: 0.7, minNoteMs: 60, minMidi: 50, maxMidi: 90, melodia: true };
+      for (const c of CASES) {
+        log(`\n=== ${c.name} ===`);
+        tr.reset();
+        const audio = await synth(c.tune, c.eighth, c.pickupFirst);
+        // Simulation du flux temps réel : blocs de 2048 échantillons, analyse au fil de l'eau.
+        for (let i = 0; i < audio.length; i += 2048) {
+          tr.push(audio.subarray(i, i + 2048));
+          if (await tr.process(false)) tr.notes(p, false);
+        }
+        await tr.process(true);
+        const notes = tr.notes(p, true);
+        log(`Notes détectées : ${notes.length} (dernière inférence ${tr.lastInferMs.toFixed(0)} ms)`);
+        if (debug) log(notes.map(x => `${x.midi}@${x.start.toFixed(2)}+${x.dur.toFixed(2)}`).join(' '));
+        const q = quantize(notes, { captureStart: 0, t0, latency: 0, unitSec: c.eighth, gridDiv: 1, barSteps: c.barSteps,
+          pickup: 'auto', autoAlign: true, final: true });
+        const last = [...q.events].reverse().find(e => e.midi != null);
+        const key = detectKey(q.events, { finalPc: last.midi % 12 });
+        log(`Recalage ${q.shiftMs} ms, levée ${q.pickupSteps}, tonalité ${key.session}`);
+        const r = renderBars({ events: q.events, barSteps: c.barSteps, gridDiv: 1, groupSteps: c.groupSteps, key,
+          header: { title: c.name, rhythm: c.rhythm, M: c.M, L: '1/8' } });
+        const abc = layoutLinear(r, 4, true);
+        log(abc);
+        check(`${c.name} — tonalité`, key.abc, c.keyAbc);
+        check(`${c.name} — ABC linéaire`, abc.trim().split('\n').slice(6).join(''), c.expected);
+        if (c.simplified) {
+          const res = simplify(r.bars, { tolerance: 0 });
+          const sabc = layoutSimplified(r, res, 4);
+          log(sabc + res.summary);
+          check(`${c.name} — ABC simplifié`, sabc.trim().split('\n').slice(6).join('\n'), c.simplified);
+        }
+      }
+    } catch (err) {
+      allOk = false;
+      log('ERREUR : ' + (err.stack || err));
+    }
+    log(allOk ? '\nFIN : TOUS LES TESTS OK' : '\nFIN : ÉCHEC');
+    document.title = allOk ? 'PASS' : 'FAIL';
+    if (report) fetch('/__log', { method: 'POST', body: out.textContent }).catch(() => {});
+  </script>
+</body>
+</html>

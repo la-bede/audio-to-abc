@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex">
+  <title>Aperçu smartphone</title>
+  <style>
+    body { margin: 0; padding: 12px; background: #777; display: flex; gap: 16px; font: 13px system-ui; color: #fff; }
+    figure { margin: 0; }
+    iframe { width: 390px; height: 844px; border: 0; background: #fff; border-radius: 12px; display: block; }
+  </style>
+</head>
+<body>
+  <!-- Aperçu de la page à la largeur d'un smartphone (390 × 844) : réglages ouverts / repliés. -->
+  <figure><iframe src="../index.html"></iframe><figcaption>Réglages ouverts</figcaption></figure>
+  <figure><iframe id="closed" src="../index.html"></iframe><figcaption>Réglages repliés</figcaption></figure>
+  <script>
+    document.getElementById('closed').addEventListener('load', (e) => {
+      const d = e.target.contentDocument;
+      d.getElementById('settingsPanel').open = false;
+      d.getElementById('abcText').value = 'X: 1\nT: Exemple\nR: reel\nM: 4/4\nL: 1/8\nK: Dmaj\n|:d2fd A2FA|dfed cABc|d2fd A2FA|1 BGFE D2FA:|2 BGFE D2A2||\n|:e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4:|';
+      d.getElementById('simplifyBtn').hidden = false;
+    });
+  </script>
+</body>
+</html>

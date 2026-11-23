@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#1f3a34">
+  <title>Audio → ABC</title>
+  <link rel="stylesheet" href="vendor/abcjs/abcjs-audio.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    { "imports": { "@tensorflow/tfjs": "./vendor/tfjs/tf.fesm.min.js" } }
+  </script>
+  <script src="vendor/abcjs/abcjs-basic-min.js"></script>
+</head>
+<body>
+  <header class="top">
+    <h1>Audio <span aria-hidden="true">→</span> ABC</h1>
+    <p id="status" class="status">Chargement du modèle Basic Pitch…</p>
+  </header>
+
+  <div id="secureWarning" class="warning wrap" hidden>
+    Cette page n'est pas servie en HTTPS (ni sur <code>localhost</code>) : le navigateur refusera l'accès au micro.
+  </div>
+
+  <main class="layout">
+    <div class="col-left">
+      <section class="card transport" id="transport">
+        <div class="transport-row">
+          <button id="recordBtn" class="rec" disabled>
+            <span class="dot" aria-hidden="true"></span><span id="recordLabel">Enregistrer</span>
+          </button>
+          <div class="beats" id="beats" aria-hidden="true"></div>
+          <span id="position" class="position">—</span>
+        </div>
+        <div class="level" aria-hidden="true"><div id="levelBar"></div></div>
+      </section>
+
+      <section class="card settings-card">
+        <details id="settingsPanel" open>
+          <summary>
+            <span class="summary-title">Réglages</span>
+            <span id="settingsSummary" class="summary-text"></span>
+          </summary>
+
+          <h2>L'air</h2>
+          <div class="grid">
+            <label class="wide">Titre (T:)
+              <input id="title" type="text" value="Sans titre" autocomplete="off">
+            </label>
+            <label>Type
+              <select id="tuneType"></select>
+            </label>
+            <label>Métrique (M:)
+              <input id="meter" type="text" inputmode="numeric" value="4/4" pattern="\d+/\d+">
+            </label>
+            <label>Note de base (L:)
+              <select id="unitL">
+                <option value="1/8">1/8</option>
+                <option value="1/4">1/4</option>
+                <option value="1/16">1/16</option>
+              </select>
+            </label>
+            <label>Tonalité (K:)
+              <select id="keySelect"><option value="auto">Auto (détection)</option></select>
+            </label>
+          </div>
+
+          <h2>Métronome</h2>
+          <div class="grid">
+            <label><span>Tempo (<span id="beatSym" class="beat-sym">blanche</span>) =</span>
+              <input id="bpm" type="number" min="30" max="240" step="1" value="90" inputmode="numeric">
+            </label>
+            <label>Pulsation
+              <select id="beat"></select>
+            </label>
+            <label>Décompte (mesures)
+              <select id="countIn">
+                <option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option>
+              </select>
+            </label>
+            <label>Levée
+              <select id="pickup">
+                <option value="auto" selected>Auto</option>
+                <option value="0">Aucune</option>
+                <option value="1">1 unité L</option>
+                <option value="2">2 unités L</option>
+                <option value="3">3 unités L</option>
+                <option value="4">4 unités L</option>
+              </select>
+            </label>
+            <label>Clic
+              <select id="clickMode">
+                <option value="always" selected>Toujours (casque conseillé)</option>
+                <option value="countin">Décompte seulement</option>
+                <option value="off">Visuel seulement</option>
+              </select>
+            </label>
+            <label>Arrêt auto
+              <select id="autoStop">
+                <option value="0">Désactivé</option>
+                <option value="1">après 1 mesure de silence</option>
+                <option value="2" selected>après 2 mesures de silence</option>
+                <option value="4">après 4 mesures de silence</option>
+              </select>
+            </label>
+            <label>Instrument
+              <select id="instrument"></select>
+            </label>
+          </div>
+          <input id="bpmRange" type="range" min="30" max="240" step="1" value="90" aria-label="Tempo">
+
+          <details class="advanced">
+            <summary>Réglages avancés (détection NeuralNote / Basic Pitch)</summary>
+            <div class="grid">
+              <label><span>Sensibilité notes : <output id="noteSensOut">0.50</output></span>
+                <input id="noteSens" type="range" min="0.05" max="0.95" step="0.05" value="0.5">
+              </label>
+              <label><span>Sensibilité séparation : <output id="splitSensOut">0.70</output></span>
+                <input id="splitSens" type="range" min="0.05" max="0.95" step="0.05" value="0.7">
+              </label>
+              <label><span>Durée min. de note : <output id="minNoteOut">60 ms</output></span>
+                <input id="minNote" type="range" min="20" max="200" step="5" value="60">
+              </label>
+              <label><span>Latence supplémentaire : <output id="latencyOut">0 ms</output></span>
+                <input id="latency" type="range" min="-250" max="250" step="5" value="0">
+              </label>
+              <label>Grille rythmique
+                <select id="grid">
+                  <option value="1" selected>= L (croches pour L:1/8)</option>
+                  <option value="2">L/2 (doubles croches)</option>
+                </select>
+              </label>
+              <label>Mesures par ligne
+                <select id="barsPerLine">
+                  <option>2</option><option selected>4</option><option>8</option>
+                </select>
+              </label>
+              <label class="check"><input id="autoAlign" type="checkbox" checked> Recalage automatique sur la grille</label>
+              <label class="check"><input id="melodia" type="checkbox" checked> Notes liées sans attaque (« melodia trick »)</label>
+            </div>
+          </details>
+        </details>
+      </section>
+
+    </div>
+
+    <div class="col-right">
+      <section class="card" id="output">
+        <div class="out-head">
+          <h2>ABC</h2>
+          <div class="buttons">
+            <button id="simplifyBtn" type="button" hidden>Simplifier (reprises)</button>
+            <button id="copyBtn" type="button">Copier</button>
+            <button id="downloadAbcBtn" type="button">.abc</button>
+          </div>
+        </div>
+        <p id="info" class="info"></p>
+        <p id="keyInfo" class="info"></p>
+        <div id="structureBox" class="structure" hidden>
+          <p id="structureInfo" class="info"></p>
+          <label class="check"><input id="tolerance" type="checkbox"> Tolérance : 1 mesure différente admise hors fins de partie</label>
+        </div>
+        <textarea id="abcText" spellcheck="false" rows="10" wrap="off" readonly></textarea>
+        <div id="paper" class="paper"></div>
+        <div id="synth" class="synth"></div>
+
+        <div id="recordingBox" hidden>
+          <h2>Enregistrement</h2>
+          <audio id="recAudio" controls></audio>
+          <div class="buttons"><a id="downloadAudio" class="button" download="enregistrement">Télécharger l'audio</a></div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        Transcription : modèle <a href="https://github.com/spotify/basic-pitch">Basic Pitch</a> (moteur de
+        <a href="https://github.com/DamRsn/NeuralNote">NeuralNote</a>) · Partition : <a href="https://github.com/paulrosen/abcjs">abcjs</a> ·
+        ABC au format <a href="https://thesession.org">thesession.org</a>
+      </footer>
+    </div>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
