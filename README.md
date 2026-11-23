@@ -3,6 +3,9 @@
 Page web (PC et Android) qui enregistre un air au micro, joué sur un métronome, et en produit la
 transcription ABC en direct, selon les conventions de [thesession.org](https://thesession.org).
 
+**Version en ligne : https://la-bede.github.io/audio-to-abc/**
+(autotests : https://la-bede.github.io/audio-to-abc/tests/selftest.html)
+
 La transcription utilise **Basic Pitch** (Spotify), le modèle sur lequel repose
 [NeuralNote](https://github.com/DamRsn/NeuralNote). NeuralNote est un plugin C++ qui ne tourne pas
 dans un navigateur : la page exécute donc le même modèle avec TensorFlow.js et reprend ses réglages
