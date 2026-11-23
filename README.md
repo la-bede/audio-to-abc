@@ -18,6 +18,10 @@ Transcription uses **Basic Pitch** (Spotify), the model behind
 browser, so the page runs the same model with TensorFlow.js and exposes its detection settings
 (note sensitivity, split sensitivity, minimum note length, pitch range).
 
+> **Intended use:** one instrument played solo, in a quiet room. So far the tool has only been
+> tested with individual instruments. It is not designed for noisy environments (a session in a
+> pub, several instruments at once, background conversation).
+
 The interface is in **English by default**. The **EN | FR** switch at the top right changes the
 language, and the browser remembers the choice.
 
@@ -146,6 +150,10 @@ La transcription utilise **Basic Pitch** (Spotify), le modèle sur lequel repose
 [NeuralNote](https://github.com/DamRsn/NeuralNote). NeuralNote est un plugin C++ qui ne tourne pas
 dans un navigateur : la page exécute donc le même modèle avec TensorFlow.js et reprend ses réglages
 de détection (sensibilité des notes, sensibilité de séparation, durée minimale, plage de hauteurs).
+
+> **Usage prévu :** un seul instrument joué en solo, dans une pièce calme. L'outil n'a été testé
+> pour l'instant qu'avec des instruments individuels. Il n'est pas conçu pour un environnement
+> bruyant (session dans un pub, plusieurs instruments à la fois, conversations autour).
 
 L'interface est **en anglais par défaut**. Le sélecteur **EN | FR** en haut à droite change la
 langue, et le navigateur retient le choix.
