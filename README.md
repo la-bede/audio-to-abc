@@ -57,6 +57,9 @@ opens the page in that language; the address follows the switch, so it can be sh
 If notes are consistently early or late, adjust *Advanced settings → Extra latency*. *Automatic
 alignment* already corrects small offsets.
 
+Settings are remembered by the browser. The **↺ Reset to default settings** link at the bottom of
+the settings restores every default value (after confirmation); the language is kept.
+
 #### Tempo mode
 
 Keeping to a metronome through a whole tune is hard, and small drifts shift the bar lines. By
@@ -224,6 +227,9 @@ telle quelle.
 
 Si les notes tombent systématiquement en avance ou en retard, ajuster *Réglages avancés → Latence
 supplémentaire*. Le *recalage automatique* corrige déjà les petits décalages.
+
+Les réglages sont mémorisés par le navigateur. Le lien **↺ Rétablir les réglages par défaut**, en
+bas des réglages, remet toutes les valeurs par défaut (après confirmation) ; la langue est conservée.
 
 #### Mode tempo
 

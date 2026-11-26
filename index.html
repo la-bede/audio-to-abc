@@ -7,25 +7,25 @@
   <meta name="theme-color" content="#1f3a34">
   <title>Audio → ABC</title>
   <link rel="stylesheet" href="vendor/abcjs/abcjs-audio.css">
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
   <!-- Version des fichiers (?v=…) : à incrémenter à chaque mise en ligne, pour qu'un navigateur
        ne mélange jamais une nouvelle page avec d'anciens scripts gardés en cache. -->
   <script type="importmap">
     {
       "imports": {
         "@tensorflow/tfjs": "./vendor/tfjs/tf.fesm.min.js",
-        "./js/main.js": "./js/main.js?v=7",
-        "./js/i18n.js": "./js/i18n.js?v=7",
-        "./js/tempo.js": "./js/tempo.js?v=7",
-        "./js/cursor.js": "./js/cursor.js?v=7",
-        "./js/tunetypes.js": "./js/tunetypes.js?v=7",
-        "./js/metronome.js": "./js/metronome.js?v=7",
-        "./js/recorder.js": "./js/recorder.js?v=7",
-        "./js/transcriber.js": "./js/transcriber.js?v=7",
-        "./js/quantize.js": "./js/quantize.js?v=7",
-        "./js/key.js": "./js/key.js?v=7",
-        "./js/abc.js": "./js/abc.js?v=7",
-        "./js/structure.js": "./js/structure.js?v=7"
+        "./js/main.js": "./js/main.js?v=8",
+        "./js/i18n.js": "./js/i18n.js?v=8",
+        "./js/tempo.js": "./js/tempo.js?v=8",
+        "./js/cursor.js": "./js/cursor.js?v=8",
+        "./js/tunetypes.js": "./js/tunetypes.js?v=8",
+        "./js/metronome.js": "./js/metronome.js?v=8",
+        "./js/recorder.js": "./js/recorder.js?v=8",
+        "./js/transcriber.js": "./js/transcriber.js?v=8",
+        "./js/quantize.js": "./js/quantize.js?v=8",
+        "./js/key.js": "./js/key.js?v=8",
+        "./js/abc.js": "./js/abc.js?v=8",
+        "./js/structure.js": "./js/structure.js?v=8"
       }
     }
   </script>
@@ -169,6 +169,7 @@
               <label class="check"><input id="melodia" type="checkbox" checked> <span data-i18n="f.melodia">Slurred notes without attack (“melodia trick”)</span></label>
             </div>
           </details>
+          <button type="button" id="resetSettings" class="link-btn" data-i18n="settings.reset">↺ Reset to default settings</button>
         </details>
       </section>
 
@@ -215,6 +216,6 @@
     <div class="player-inner"><div id="synth" class="synth"></div></div>
   </div>
 
-  <script type="module" src="js/main.js?v=7"></script>
+  <script type="module" src="js/main.js?v=8"></script>
 </body>
 </html>

@@ -54,6 +54,27 @@
       await ready(d);
       log('Rechargement sans paramètre : ' + snapshot(d));
 
+      // Bouton « Rétablir les réglages par défaut » : réglages modifiés → valeurs d'origine, langue conservée.
+      {
+        const q = (id) => d.getElementById(id);
+        const set = (id, v, ev = 'change') => { q(id).value = v; q(id).dispatchEvent(new Event(ev)); };
+        set('tuneType', 'jig'); set('keySelect', '9-dorian'); set('tempoMode', 'fixed'); set('countIn', '4');
+        set('noteSens', '0.8', 'input'); set('latency', '60', 'input'); set('title', 'Essai', 'input');
+        const snap = () => ['tuneType', 'meter', 'keySelect', 'tempoMode', 'countIn', 'bpm', 'noteSens', 'latency', 'autoStop', 'title']
+          .map(id => `${id}=${q(id).value || '∅'}`).join(' ');
+        log('\nRéglages modifiés : ' + snap());
+        w.confirm = () => true;   // confirmation acceptée automatiquement
+        q('resetSettings').click();
+        await wait(300);
+        const head = q('abcText').value.trim().split('\n').filter(l => /^[TRMK]:/.test(l)).join(' | ');
+        log(`Après « Rétablir » : ${snap()} | langue=${d.documentElement.lang} | aperçu ${head}`);
+        frame.contentWindow.location.reload();
+        await loaded();
+        w = frame.contentWindow; d = w.document; watch(w);
+        await ready(d);
+        log('Après rechargement : ' + snap());
+      }
+
       const $ = (id) => d.getElementById(id);
       const btn = $('recordBtn');
       log('\nMode tempo par défaut : ' + $('tempoMode').value);

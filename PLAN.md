@@ -280,3 +280,10 @@ Nouveau : `js/cursor.js`. Modifiés : `index.html`, `css/style.css`, `js/main.js
 - Lecteur de l'ABC synthétisé fixé en bas : aligné sur la colonne de la partition (PC), empilé au-dessus de la barre d'enregistrement (smartphone) ; marges de page et défilement du curseur tiennent compte des barres du bas.
 - Pendant la lecture (ABC synthétisé et enregistrement) : barre verticale + **note en cours en rouge**.
 - Lecteur absent sur smartphone : cause probable = cache (nouvelle page + ancien script). Correctif : version `?v=…` sur la feuille de style, les modules (import map) et le worklet, à incrémenter à chaque mise en ligne.
+
+---
+
+# Plan v7 (itération 7) — Bouton « Rétablir les réglages par défaut »
+
+- Lien en bas du panneau Réglages, avec confirmation : chaque réglage mémorisé revient à sa valeur d'origine (valeurs du HTML, type reel, instrument générique, tonalité auto, titre vide) ; la langue est conservée ; la transcription affichée ou l'aperçu ABC est recalculé. Désactivé pendant un enregistrement.
+- Version des fichiers `?v=8`.

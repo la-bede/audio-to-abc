@@ -22,6 +22,8 @@ const DICT = {
     'pos.bar': 'Bar {n}',
 
     'settings': 'Settings',
+    'settings.reset': '↺ Reset to default settings',
+    'settings.resetConfirm': 'Reset all settings to their default values? (The language is kept.)',
     'h.tune': 'The tune',
     'h.metronome': 'Metronome',
     'f.title': 'Title (T:)',
@@ -140,6 +142,8 @@ const DICT = {
     'pos.bar': 'Mesure {n}',
 
     'settings': 'Réglages',
+    'settings.reset': '↺ Rétablir les réglages par défaut',
+    'settings.resetConfirm': 'Remettre tous les réglages à leurs valeurs par défaut ? (La langue est conservée.)',
     'h.tune': 'L\'air',
     'h.metronome': 'Métronome',
     'f.title': 'Titre (T:)',

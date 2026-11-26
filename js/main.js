@@ -25,7 +25,7 @@ const el = {
   recordingBox: $('recordingBox'), recAudio: $('recAudio'), downloadAudio: $('downloadAudio'),
   autoStop: $('autoStop'), simplifyBtn: $('simplifyBtn'), structureBox: $('structureBox'), structureInfo: $('structureInfo'),
   tolerance: $('tolerance'), settingsPanel: $('settingsPanel'), settingsSummary: $('settingsSummary'),
-  tempoMode: $('tempoMode'), playerBar: $('playerBar'),
+  tempoMode: $('tempoMode'), playerBar: $('playerBar'), resetSettings: $('resetSettings'),
 };
 
 const transcriber = new Transcriber();
@@ -206,6 +206,34 @@ function loadSettings() {
     return true;
   } catch (_) { return false; }
 }
+
+// Retour aux réglages par défaut (la langue, choisie à part, est conservée).
+// Champs écrits dans le HTML : valeur d'origine (defaultValue / defaultChecked / defaultSelected) ;
+// listes remplies par le script : valeurs par défaut explicites, puis réglages du type « reel ».
+const SCRIPT_DEFAULTS = { tuneType: 'reel', instrument: 'generic', keySelect: 'auto' };
+function resetSettings() {
+  if (state === 'recording' || state === 'stopping') return;
+  if (!window.confirm(t('settings.resetConfirm'))) return;
+  for (const k of PERSIST) {
+    const e = el[k];
+    if (k in SCRIPT_DEFAULTS) { e.value = SCRIPT_DEFAULTS[k]; continue; }
+    if (e.type === 'checkbox') { e.checked = e.defaultChecked; continue; }
+    if (e.tagName === 'SELECT') {
+      const def = [...e.options].find(o => o.defaultSelected) || e.options[0];
+      e.value = def.value;
+      continue;
+    }
+    e.value = e.defaultValue;
+  }
+  applyTuneType();                 // M:, L:, pulsation et tempo du type par défaut
+  applyTuneTypeLockState();
+  $('noteSensOut').textContent = Number(el.noteSens.value).toFixed(2);
+  $('splitSensOut').textContent = Number(el.splitSens.value).toFixed(2);
+  $('minNoteOut').textContent = `${el.minNote.value} ms`;
+  $('latencyOut').textContent = `${el.latency.value} ms`;
+  onSettingsChanged('detect');     // enregistre, puis recalcule la transcription ou l'aperçu
+}
+el.resetSettings.addEventListener('click', resetSettings);
 
 // Résumé affiché quand le panneau de réglages est replié (smartphone).
 function updateSummary() {
@@ -467,7 +495,7 @@ async function stopRecording(reason = null) {
 
 // Tempo, pulsation et décompte sont figés pour l'enregistrement en cours (la grille en dépend).
 function setSettingsLocked(locked) {
-  for (const k of ['bpm', 'bpmRange', 'beat', 'countIn', 'clickMode', 'tuneType', 'meter', 'unitL', 'tempoMode']) el[k].disabled = locked;
+  for (const k of ['bpm', 'bpmRange', 'beat', 'countIn', 'clickMode', 'tuneType', 'meter', 'unitL', 'tempoMode', 'resetSettings']) el[k].disabled = locked;
   if (!locked) applyTuneTypeLockState();
 }
 function applyTuneTypeLockState() {
