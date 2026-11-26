@@ -12,9 +12,9 @@
 </head>
 <body>
   <!-- Aperçu de la page à la largeur d'un smartphone (390 × 844) : réglages ouverts / transcription
-       longue, défilée vers le bas, avec le lecteur collé en haut et un curseur de lecture. -->
+       longue, défilée vers le bas, avec le lecteur fixé en bas et un curseur de lecture. -->
   <figure><iframe src="../index.html"></iframe><figcaption>Réglages ouverts</figcaption></figure>
-  <figure><iframe id="closed" src="../index.html"></iframe><figcaption>Transcription longue, page défilée (lecteur en haut)</figcaption></figure>
+  <figure><iframe id="closed" src="../index.html"></iframe><figcaption>Transcription longue, page défilée (lecteur en bas)</figcaption></figure>
   <script>
     const LONG = 'X: 1\nT: Exemple\nR: reel\nM: 4/4\nL: 1/8\nK: Dmaj\n'
       + '|:d2fd A2FA|dfed cABc|d2fd A2FA|1 BGFE D2FA:|2 BGFE D2A2||\n|:e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4:|\n'.repeat(4);
@@ -28,6 +28,7 @@
         const sc = new w.ABCJS.synth.SynthController();
         sc.load(d.getElementById('synth'), null, { displayRestart: true, displayPlay: true, displayProgress: true, displayWarp: true, displayLoop: true });
         d.getElementById('playerBar').hidden = false;
+        d.body.classList.add('has-player');
         // Curseur factice sur une note pour l'aperçu.
         const ev = visual.setTiming(60, 0).filter(x => x.type === 'event' && x.left != null)[40];
         const line = d.createElementNS('http://www.w3.org/2000/svg', 'line');

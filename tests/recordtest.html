@@ -95,14 +95,21 @@
         log('bouton : ' + $('recordLabel').textContent + ' | Simplifier visible : ' + !$('simplifyBtn').hidden);
         log('ABC :\n' + $('abcText').value.trim());
         if (round === 1) {
-          // Lecteur collé en haut, même en bas de page.
-          w.scrollTo(0, d.documentElement.scrollHeight);
-          await wait(400);
-          const rect = $('playerBar').getBoundingClientRect();
-          log(`lecteur après défilement : visible=${!$('playerBar').hidden}, haut=${Math.round(rect.top)} px, hauteur=${Math.round(rect.height)} px, défilement=${Math.round(w.scrollY)} px`);
-          // Curseur pendant la lecture de l'enregistrement.
+          // Lecteur fixé en bas (au-dessus de la barre d'enregistrement en largeur smartphone), en haut et en bas de page.
+          for (const where of ['haut', 'bas']) {
+            w.scrollTo(0, where === 'haut' ? 0 : d.documentElement.scrollHeight);
+            await wait(400);
+            const rect = $('playerBar').getBoundingClientRect();
+            const tr = $('transport').getBoundingClientRect();
+            const col = $('colRight').getBoundingClientRect();
+            log(`lecteur (page en ${where}) : visible=${!$('playerBar').hidden}, bas=${Math.round(rect.bottom)} px / fenêtre ${w.innerHeight} px, barre d'enregistrement en haut à ${Math.round(tr.top)} px, gauche/largeur ${Math.round(rect.left)}/${Math.round(rect.width)} px (colonne partition ${Math.round(col.left)}/${Math.round(col.width)} px)`);
+          }
+          // Curseur et note en rouge pendant la lecture de l'enregistrement.
           const audio = $('recAudio');
-          const cursorX = () => d.querySelector('#paper .abcjs-cursor')?.getAttribute('x1') ?? 'absent';
+          const cursorX = () => {
+            const x = d.querySelector('#paper .abcjs-cursor')?.getAttribute('x1');
+            return x == null ? 'absent' : `${Math.round(x)} (notes en rouge : ${d.querySelectorAll('#paper .abcjs-playing').length})`;
+          };
           audio.currentTime = 3.5;
           try { await audio.play(); } catch (e) { log('lecture audio refusée : ' + e.message); }
           await wait(1200);

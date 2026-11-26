@@ -49,7 +49,9 @@ export class Recorder {
     this.inputLatency = typeof settings.latency === 'number' ? settings.latency : 0;
 
     if (!this.workletLoaded) {
-      await this.ctx.audioWorklet.addModule(new URL('./worklet-capture.js', import.meta.url));
+      // Même version (?v=…) que ce module, pour ne pas reprendre un ancien worklet en cache.
+      const version = new URL(import.meta.url).search;
+      await this.ctx.audioWorklet.addModule(new URL(`./worklet-capture.js${version}`, import.meta.url));
       this.workletLoaded = true;
     }
     this.source = this.ctx.createMediaStreamSource(this.stream);

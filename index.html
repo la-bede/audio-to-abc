@@ -7,18 +7,31 @@
   <meta name="theme-color" content="#1f3a34">
   <title>Audio → ABC</title>
   <link rel="stylesheet" href="vendor/abcjs/abcjs-audio.css">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=7">
+  <!-- Version des fichiers (?v=…) : à incrémenter à chaque mise en ligne, pour qu'un navigateur
+       ne mélange jamais une nouvelle page avec d'anciens scripts gardés en cache. -->
   <script type="importmap">
-    { "imports": { "@tensorflow/tfjs": "./vendor/tfjs/tf.fesm.min.js" } }
+    {
+      "imports": {
+        "@tensorflow/tfjs": "./vendor/tfjs/tf.fesm.min.js",
+        "./js/main.js": "./js/main.js?v=7",
+        "./js/i18n.js": "./js/i18n.js?v=7",
+        "./js/tempo.js": "./js/tempo.js?v=7",
+        "./js/cursor.js": "./js/cursor.js?v=7",
+        "./js/tunetypes.js": "./js/tunetypes.js?v=7",
+        "./js/metronome.js": "./js/metronome.js?v=7",
+        "./js/recorder.js": "./js/recorder.js?v=7",
+        "./js/transcriber.js": "./js/transcriber.js?v=7",
+        "./js/quantize.js": "./js/quantize.js?v=7",
+        "./js/key.js": "./js/key.js?v=7",
+        "./js/abc.js": "./js/abc.js?v=7",
+        "./js/structure.js": "./js/structure.js?v=7"
+      }
+    }
   </script>
   <script src="vendor/abcjs/abcjs-basic-min.js"></script>
 </head>
 <body>
-  <!-- Lecteur de l'ABC synthétisé : toujours visible en haut de l'écran une fois la transcription faite. -->
-  <div id="playerBar" class="player-bar" hidden>
-    <div class="player-inner"><div id="synth" class="synth"></div></div>
-  </div>
-
   <header class="top">
     <h1>Audio <span aria-hidden="true">→</span> ABC</h1>
     <p id="status" class="status">Loading the Basic Pitch model…</p>
@@ -161,7 +174,7 @@
 
     </div>
 
-    <div class="col-right">
+    <div class="col-right" id="colRight">
       <section class="card" id="output">
         <div class="out-head">
           <h2>ABC</h2>
@@ -196,6 +209,12 @@
     </div>
   </main>
 
-  <script type="module" src="js/main.js"></script>
+  <!-- Lecteur de l'ABC synthétisé : fixé en bas, sous la partition (PC) ou au-dessus de la barre
+       d'enregistrement (smartphone), une fois la transcription faite. -->
+  <div id="playerBar" class="player-bar" hidden>
+    <div class="player-inner"><div id="synth" class="synth"></div></div>
+  </div>
+
+  <script type="module" src="js/main.js?v=7"></script>
 </body>
 </html>

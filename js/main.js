@@ -576,6 +576,8 @@ function setupSynth(visual) {
     };
     synthControl.load('#synth', cursorControl, { displayRestart: true, displayPlay: true, displayProgress: true, displayWarp: true, displayLoop: true });
     el.playerBar.hidden = false;
+    document.body.classList.add('has-player');
+    layoutBars();
   }
   const s = readSettings();
   // Tempo de lecture : tempo moyen suivi, sinon celui du métronome.
@@ -588,6 +590,8 @@ function destroySynth() {
   synthControl = null;
   el.synth.innerHTML = '';
   el.playerBar.hidden = true;
+  document.body.classList.remove('has-player');
+  layoutBars();
   lastRendered = '';
 }
 
@@ -630,13 +634,29 @@ translateUi();
 syncPanel();
 renderPreview();
 
-// Hauteur du lecteur collé en haut → variable CSS (colonne gauche collante, défilement du curseur).
-if (window.ResizeObserver) {
-  new ResizeObserver(() => {
-    const h = el.playerBar.hidden ? 0 : el.playerBar.offsetHeight;
-    document.documentElement.style.setProperty('--player-h', `${h}px`);
-  }).observe(el.playerBar);
+// Barres fixées en bas : hauteurs publiées en variables CSS (marges, défilement du curseur) et, sur
+// PC, lecteur aligné sur la colonne de la partition.
+function layoutBars() {
+  const root = document.documentElement.style;
+  const transportFixed = getComputedStyle($('transport')).position === 'fixed';
+  root.setProperty('--transport-h', `${transportFixed ? $('transport').offsetHeight : 0}px`);
+  root.setProperty('--player-h', `${el.playerBar.hidden ? 0 : el.playerBar.offsetHeight}px`);
+  if (desktop.matches) {
+    const r = $('colRight').getBoundingClientRect();
+    Object.assign(el.playerBar.style, { left: `${r.left}px`, width: `${r.width}px`, right: 'auto' });
+  } else {
+    Object.assign(el.playerBar.style, { left: '0', width: 'auto', right: '0' });
+  }
 }
+window.addEventListener('resize', layoutBars);
+if (desktop.addEventListener) desktop.addEventListener('change', layoutBars);
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(layoutBars);
+  ro.observe(el.playerBar);
+  ro.observe($('transport'));
+  ro.observe($('colRight'));
+}
+layoutBars();
 
 // ---------------------------------------------------------------------------------------------
 // Curseur pendant la lecture de l'enregistrement : temps du média → position dans l'air → partition.

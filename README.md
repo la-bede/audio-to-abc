@@ -41,11 +41,12 @@ opens the page in that language; the address follows the switch, so it can be sh
    “Count-in only” or “Visual only” click. The ABC updates about every 1.6 s, 2 to 3 s behind.
 5. Recording **stops by itself** after 2 bars without notes (configurable: 1, 2, 4 bars or off).
    You can also click **Stop**. The ABC then becomes editable, and you can:
-   - listen to the synthesised ABC: its player stays pinned to the top of the screen, however
-     long the ABC is;
+   - listen to the synthesised ABC: its player stays fixed at the bottom of the screen, however
+     long the ABC is (under the score on a computer, above the record bar on a smartphone);
    - play back the recording (player under the score);
-   - follow either playback on the score: a vertical bar shows the current position (for the
-     recording, in the linear version only);
+   - follow either playback on the score: a vertical bar shows the current position and the
+     current note turns red, the page scrolling along (for the recording, in the linear version
+     only);
    - copy the ABC (it pastes line by line into LibreOffice Writer or Word, and as plain text in a
      text editor) or download it as `.abc`;
    - change the key, pickup, grid or detection thresholds: the ABC is recomputed without
@@ -206,11 +207,13 @@ telle quelle.
    2 à 3 s de retard.
 5. L'enregistrement **s'arrête tout seul** après 2 mesures sans note (réglable : 1, 2, 4 mesures
    ou désactivé). On peut aussi cliquer sur **Arrêter**. L'ABC devient alors modifiable, et on peut :
-   - écouter l'ABC synthétisé : son lecteur reste collé en haut de l'écran, quelle que soit la
-     longueur de l'ABC ;
+   - écouter l'ABC synthétisé : son lecteur reste fixé en bas de l'écran, quelle que soit la
+     longueur de l'ABC (sous la partition sur ordinateur, au-dessus de la barre d'enregistrement
+     sur smartphone) ;
    - réécouter l'enregistrement (lecteur sous la partition) ;
    - suivre l'une ou l'autre lecture sur la partition : une barre verticale indique la position en
-     cours (pour l'enregistrement, en version linéaire seulement) ;
+     cours et la note jouée passe en rouge, la page défilant avec la lecture (pour l'enregistrement,
+     en version linéaire seulement) ;
    - copier l'ABC (il se colle ligne par ligne dans LibreOffice Writer ou Word, et en texte brut
      dans un éditeur de texte) ou le télécharger en `.abc` ;
    - changer la tonalité, la levée, la grille ou les seuils de détection, et l'ABC est recalculé

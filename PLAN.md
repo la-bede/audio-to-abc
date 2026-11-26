@@ -271,3 +271,12 @@ Nouveau : `js/cursor.js`. Modifiés : `index.html`, `css/style.css`, `js/main.js
 3. Captures bureau (1440 px) et smartphone (390 px, `tests/mobile-preview.html`) avec un ABC long : lecteur en haut, barre d'enregistrement en bas, pas de chevauchement.
 4. Commit + push sur `main`, contrôle de la version en ligne.
 5. Test utilisateur : collage dans LibreOffice Writer (lignes séparées), lecture avec curseur sur PC et smartphone.
+
+---
+
+# Plan v6 (itération 6) — Lecteur fixé en bas (proposition A), note en cours en rouge, version des fichiers
+
+- Maquettes comparées localement (`proposals/`, hors git) : A (barre en bas au droit de la partition), B (partition défilante avec lecteur intégré), C (lecteur compact). Choix de l'utilisateur : **A sur PC et sur smartphone**.
+- Lecteur de l'ABC synthétisé fixé en bas : aligné sur la colonne de la partition (PC), empilé au-dessus de la barre d'enregistrement (smartphone) ; marges de page et défilement du curseur tiennent compte des barres du bas.
+- Pendant la lecture (ABC synthétisé et enregistrement) : barre verticale + **note en cours en rouge**.
+- Lecteur absent sur smartphone : cause probable = cache (nouvelle page + ancien script). Correctif : version `?v=…` sur la feuille de style, les modules (import map) et le worklet, à incrémenter à chaque mise en ligne.

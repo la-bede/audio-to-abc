@@ -9,6 +9,16 @@ export class PlaybackCursor {
     this.paper = paper;
     this.line = null;
     this.lastTop = null;
+    this.lit = [];            // éléments SVG de la note en cours (affichée en rouge)
+  }
+
+  // Note en cours en rouge : ev.elements = groupes d'éléments SVG de la note (abcjs).
+  highlight(ev) {
+    for (const e of this.lit) e.classList.remove('abcjs-playing');
+    this.lit = [];
+    for (const group of ev.elements || []) {
+      for (const e of group || []) { e.classList.add('abcjs-playing'); this.lit.push(e); }
+    }
   }
 
   /** ev : { left, top, height } en coordonnées SVG (événement abcjs ou entrée de noteTimings). */
@@ -22,6 +32,7 @@ export class PlaybackCursor {
       svg.appendChild(this.line);
       this.lastTop = null;
     }
+    this.highlight(ev);
     const x = ev.left - 2;
     this.line.setAttribute('x1', x);
     this.line.setAttribute('x2', x);
@@ -34,21 +45,23 @@ export class PlaybackCursor {
   }
 
   hide() {
+    for (const e of this.lit) e.classList.remove('abcjs-playing');
+    this.lit = [];
     if (this.line) this.line.remove();
     this.line = null;
     this.lastTop = null;
   }
 
-  // Fait défiler la page si la ligne courante est masquée par le lecteur (haut) ou la barre
-  // d'enregistrement fixée en bas (smartphone).
+  // Fait défiler la page pour garder la ligne jouée dans le haut de l'écran, au-dessus des barres
+  // fixées en bas (lecteur, et barre d'enregistrement sur smartphone).
   keepVisible() {
     if (!this.line) return;
     const r = this.line.getBoundingClientRect();
-    const playerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--player-h')) || 0;
-    const transport = document.getElementById('transport');
-    const bottomBar = transport && getComputedStyle(transport).position === 'fixed' ? transport.offsetHeight : 0;
-    const top = playerH + 8;
-    const bottom = window.innerHeight - bottomBar - 8;
+    const css = getComputedStyle(document.documentElement);
+    const bottomBars = (parseFloat(css.getPropertyValue('--player-h')) || 0)
+      + (parseFloat(css.getPropertyValue('--transport-h')) || 0);
+    const top = 8;
+    const bottom = window.innerHeight - bottomBars - 8;
     if (r.top < top || r.bottom > bottom) {
       window.scrollBy({ top: r.top - (top + (bottom - top) / 4), behavior: 'smooth' });
     }
