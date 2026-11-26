@@ -32,6 +32,7 @@ export class Recorder {
   constructor(ctx) {
     this.ctx = ctx;
     this.onSamples = null; // (Float32Array à 22 050 Hz) => void
+    this.onLevel = null;   // (temps ctx du bloc, RMS) => void
   }
 
   async start() {
@@ -68,9 +69,10 @@ export class Recorder {
     this.node.port.onmessage = (e) => {
       const { frame, samples } = e.data;
       if (this.firstTime === null) this.firstTime = frame / this.ctx.sampleRate;
-      let p = 0;
-      for (let i = 0; i < samples.length; i++) { const v = Math.abs(samples[i]); if (v > p) p = v; }
+      let p = 0, sq = 0;
+      for (let i = 0; i < samples.length; i++) { const v = Math.abs(samples[i]); if (v > p) p = v; sq += v * v; }
       this.peak = Math.max(p, this.peak * 0.9);
+      if (this.onLevel) this.onLevel(frame / this.ctx.sampleRate, Math.sqrt(sq / samples.length));
       const out = this.resampler.push(samples);
       if (out.length && this.onSamples) this.onSamples(out);
     };

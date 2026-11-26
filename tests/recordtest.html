@@ -37,27 +37,44 @@
       await ready(d);
       log('Langue par défaut : ' + snapshot(d));
 
-      // Bascule en français, rechargement : le choix doit être conservé.
-      d.querySelector('.lang[data-lang="fr"]').click();
-      log('Après clic FR : ' + snapshot(d));
-      frame.contentWindow.location.reload();
+      // Lien ?lang=fr : la page doit s'ouvrir en français.
+      frame.contentWindow.location.href = '../index.html?lang=fr';
       await loaded();
       w = frame.contentWindow; d = w.document; watch(w);
       await ready(d);
-      log('Après rechargement : ' + snapshot(d));
+      log('Lien ?lang=fr : ' + snapshot(d));
+      // Bascule EN : l'adresse suit ; puis retour FR par le bouton et rechargement sans paramètre : choix conservé.
+      d.querySelector('.lang[data-lang="en"]').click();
+      log('Clic EN → adresse ' + w.location.search + ' | ' + snapshot(d));
+      d.querySelector('.lang[data-lang="fr"]').click();
+      log('Clic FR → adresse ' + w.location.search);
+      frame.contentWindow.location.href = '../index.html';
+      await loaded();
+      w = frame.contentWindow; d = w.document; watch(w);
+      await ready(d);
+      log('Rechargement sans paramètre : ' + snapshot(d));
 
       const $ = (id) => d.getElementById(id);
       const btn = $('recordBtn');
-      for (let round = 1; round <= 2; round++) {
-        log(`\n--- Enregistrement ${round} (bouton : « ${$('recordLabel').textContent} ») ---`);
+      const modes = ['track-level', 'track-abc', 'fixed'];
+      $('autoStop').value = '0'; $('autoStop').dispatchEvent(new Event('change')); // durée maîtrisée par le test
+      for (let round = 1; round <= modes.length; round++) {
+        $('tempoMode').value = modes[round - 1];
+        $('tempoMode').dispatchEvent(new Event('change'));
+        log(`\n--- Enregistrement ${round}, mode ${modes[round - 1]} (bouton : « ${$('recordLabel').textContent} ») ---`);
         btn.click();
-        // Jusqu'à 8 s d'enregistrement ; l'arrêt automatique peut survenir avant (faux micro peu détecté).
-        let auto = false;
-        for (let i = 0; i < 40; i++) {
+        // 10 s d'enregistrement ; on note quand le clic s'arrête (body[data-click]).
+        let auto = false, clickOff = null;
+        const start = performance.now();
+        for (let i = 0; i < 50; i++) {
           await wait(200);
-          if (i === 30) log('pendant : ' + $('position').textContent + ' | bouton : ' + $('recordLabel').textContent);
+          if (clickOff === null && d.body.dataset.click === 'off' && d.body.dataset.state === 'recording') {
+            clickOff = `${((performance.now() - start) / 1000).toFixed(1)} s après le départ (${$('position').textContent})`;
+          }
+          if (i === 40) log('pendant : ' + $('position').textContent + ' | bouton : ' + $('recordLabel').textContent);
           if (d.body.dataset.state === 'done') { auto = true; break; }
         }
+        log('clic arrêté : ' + (clickOff || 'non (clic jusqu\'à la fin)'));
         if (!auto) btn.click();
         log(auto ? 'arrêt automatique déclenché' : 'arrêt manuel');
         for (let i = 0; i < 50 && d.body.dataset.state !== 'done'; i++) await wait(200);

@@ -1,7 +1,8 @@
 // Orchestration : réglages → métronome + micro → Basic Pitch → quantification → ABC → partition.
 
 import { TUNE_TYPES, INSTRUMENTS, BEAT_CHOICES, parseFraction, defaultBeat, defaultGroup, beatSymbol, tuneTypeLabel } from './tunetypes.js';
-import { t, getLang, setLang, applyStatic } from './i18n.js';
+import { t, getLang, setLang, applyStatic, syncUrl } from './i18n.js';
+import { PlayDetector } from './tempo.js';
 import { Metronome } from './metronome.js';
 import { Recorder } from './recorder.js';
 import { Transcriber } from './transcriber.js';
@@ -23,6 +24,7 @@ const el = {
   recordingBox: $('recordingBox'), recAudio: $('recAudio'), downloadAudio: $('downloadAudio'),
   autoStop: $('autoStop'), simplifyBtn: $('simplifyBtn'), structureBox: $('structureBox'), structureInfo: $('structureInfo'),
   tolerance: $('tolerance'), settingsPanel: $('settingsPanel'), settingsSummary: $('settingsSummary'),
+  tempoMode: $('tempoMode'),
 };
 
 const transcriber = new Transcriber();
@@ -36,7 +38,8 @@ let simplified = false;   // affichage de la version simplifiée (reprises / vol
 let audioUrl = null;      // URL objet de l'enregistrement courant
 let stopReason = null;     // { key, vars } : raison de l'arrêt automatique
 let statusMsg = { key: 'status.loading' };
-let infoMsg = null;       // message hors transcription (erreur micro, métrique invalide)
+let infoMsg = null;
+let lastQ = null;         // dernière quantification (événements, tempo suivi)       // message hors transcription (erreur micro, métrique invalide)
 const desktop = window.matchMedia('(min-width: 1024px)');
 
 // ---------------------------------------------------------------------------------------------
@@ -97,7 +100,7 @@ function updateRecordLabel() {
 }
 
 for (const b of document.querySelectorAll('.lang-switch .lang')) {
-  b.addEventListener('click', () => { setLang(b.dataset.lang); translateUi(); });
+  b.addEventListener('click', () => { setLang(b.dataset.lang); syncUrl(); translateUi(); });
 }
 
 if (!window.isSecureContext) $('secureWarning').hidden = false;
@@ -163,6 +166,7 @@ function readSettings() {
     gridDiv, barSteps: Math.round(unitsPerBar * gridDiv), groupSteps: Math.max(1, Math.round(groupUnits * gridDiv)),
     barsPerLine: Number(el.barsPerLine.value), keyId: el.keySelect.value, title: el.title.value.trim() || t('untitled'),
     autoStopBars: Number(el.autoStop.value), tolerance: el.tolerance.checked ? 1 : 0,
+    tempoMode: el.tempoMode.value, track: el.tempoMode.value !== 'fixed',
     autoAlign: el.autoAlign.checked, extraLatency: Number(el.latency.value) / 1000,
     detect: {
       noteSensitivity: Number(el.noteSens.value), splitSensitivity: Number(el.splitSens.value),
@@ -173,7 +177,7 @@ function readSettings() {
 
 // Persistance locale des réglages (confort uniquement).
 const PERSIST = ['title', 'tuneType', 'meter', 'unitL', 'keySelect', 'bpm', 'beat', 'countIn', 'pickup', 'clickMode', 'instrument',
-  'noteSens', 'splitSens', 'minNote', 'latency', 'grid', 'barsPerLine', 'autoAlign', 'melodia', 'autoStop', 'tolerance'];
+  'noteSens', 'splitSens', 'minNote', 'latency', 'grid', 'barsPerLine', 'autoAlign', 'melodia', 'autoStop', 'tolerance', 'tempoMode'];
 function saveSettings() {
   updateSummary();
   try {
@@ -215,7 +219,7 @@ el.beat.addEventListener('change', () => { refreshBeatUi(); saveSettings(); });
 el.bpm.addEventListener('change', () => { setBpm(el.bpm.value); saveSettings(); });
 el.bpmRange.addEventListener('input', () => { setBpm(el.bpmRange.value); saveSettings(); });
 for (const k of ['countIn', 'clickMode', 'autoStop']) el[k].addEventListener('change', saveSettings);
-for (const k of ['pickup', 'keySelect', 'grid', 'barsPerLine', 'autoAlign', 'tolerance']) el[k].addEventListener('change', () => onSettingsChanged('quant'));
+for (const k of ['pickup', 'keySelect', 'grid', 'barsPerLine', 'autoAlign', 'tolerance', 'tempoMode']) el[k].addEventListener('change', () => onSettingsChanged('quant'));
 el.title.addEventListener('input', () => onSettingsChanged('quant'));
 el.latency.addEventListener('input', () => { $('latencyOut').textContent = `${el.latency.value} ms`; onSettingsChanged('quant'); });
 el.noteSens.addEventListener('input', () => { $('noteSensOut').textContent = Number(el.noteSens.value).toFixed(2); onSettingsChanged('detect'); });
@@ -300,8 +304,16 @@ async function startRecording() {
   metronome.start({ bpm: s.bpm, beatsPerBar: s.beatsPerBar, countInBars: s.countInBars, startTime, sound: s.clickMode });
   session = {
     bpm: s.bpm, beat: s.beat, beatsPerBar: s.beatsPerBar, t0: metronome.t0,
-    latency: recorder.roundTripLatency(), final: false,
+    latency: recorder.roundTripLatency(), final: false, mode: s.tempoMode,
+    barSec: s.beatsPerBar * (60 / s.bpm),
   };
+  // Mode « clic arrêté après la mesure 2 » : début de jeu détecté au niveau du micro.
+  const detector = s.tempoMode === 'track-level' ? new PlayDetector() : null;
+  recorder.onLevel = detector ? (time, rms) => {
+    if (session.clickStopPlanned || !metronome.clicking()) return;
+    const start = detector.push(time - session.latency, rms);
+    if (start !== null) planClickStop(start);
+  } : null;
   state = 'recording';
   el.recordBtn.disabled = false;
   el.recordBtn.classList.add('recording');
@@ -316,11 +328,19 @@ async function startRecording() {
       const st = readSettings();
       notes = transcriber.notes(st.detect, false);
       regenerate();
-      const barSec = (st.meter.value / session.beat) * (60 / session.bpm);
+      const barUnits = st.meter.value / st.unit;
+      const barSec = lastQ?.tempo ? barUnits * lastQ.tempo.unitSecNow : (st.meter.value / session.beat) * (60 / session.bpm);
       const auto = shouldAutoStop({
         notes, analyzedSec: transcriber.analyzedSec(), captureStart: recorder.firstTime ?? session.t0,
         t0: session.t0, barSec, bars: st.autoStopBars, latency: session.latency + st.extraLatency,
       });
+      // Mode « clic arrêté après 2 mesures transcrites ».
+      if (session.mode === 'track-abc' && !session.clickStopPlanned && metronome.clicking()
+          && lastQ && lastQ.events.some(e => e.midi != null && e.pos >= 2 * st.barSteps)) {
+        session.clickStopPlanned = true;
+        metronome.stopAt(metronome.nextDownbeatAfter(ctx.currentTime + 0.2));
+      }
+      updateClickState();
       if (auto.stop && state === 'recording') {
         const n = st.autoStopBars;
         stopRecording({ key: n > 1 ? 'info.autoStopped' : 'info.autoStopped1', vars: { n } });
@@ -328,6 +348,19 @@ async function startRecording() {
     }
   }, 250);
   animate();
+}
+
+// Arrêt du clic deux mesures après le début de jeu détecté (hors levée) : si le jeu commence
+// pendant le décompte ou dans la 1re moitié d'une mesure, cette mesure compte comme la 1re.
+function planClickStop(playStart) {
+  const rel = (playStart - session.t0) / session.barSec;
+  const startBar = rel < 0 ? 0 : Math.floor(rel) + (rel - Math.floor(rel) >= 0.5 ? 1 : 0);
+  session.clickStopPlanned = true;
+  metronome.stopAt(session.t0 + (startBar + 2) * session.barSec);
+}
+
+function updateClickState() {
+  document.body.dataset.click = metronome && metronome.clicking() ? 'on' : 'off';
 }
 
 // Remet à zéro la sortie avant une nouvelle transcription (sans recharger la page).
@@ -338,6 +371,7 @@ function resetOutput() {
   stopReason = null;
   infoMsg = null;
   session = null;
+  lastQ = null;
   updateSimplifyButton();
   el.simplifyBtn.hidden = true;
   el.structureBox.hidden = true;
@@ -361,6 +395,8 @@ async function stopRecording(reason = null) {
   updateRecordLabel();
   clearInterval(pollTimer);
   metronome.stop();
+  recorder.onLevel = null;
+  updateClickState();
   const blob = await recorder.stop();
   while (transcriber.busy) await new Promise(r => setTimeout(r, 30));
   await transcriber.process(true);
@@ -392,7 +428,7 @@ async function stopRecording(reason = null) {
 
 // Tempo, pulsation et décompte sont figés pour l'enregistrement en cours (la grille en dépend).
 function setSettingsLocked(locked) {
-  for (const k of ['bpm', 'bpmRange', 'beat', 'countIn', 'clickMode', 'tuneType', 'meter', 'unitL']) el[k].disabled = locked;
+  for (const k of ['bpm', 'bpmRange', 'beat', 'countIn', 'clickMode', 'tuneType', 'meter', 'unitL', 'tempoMode']) el[k].disabled = locked;
   if (!locked) applyTuneTypeLockState();
 }
 function applyTuneTypeLockState() {
@@ -412,8 +448,9 @@ function regenerate() {
   const q = quantize(notes, {
     captureStart: recorder.firstTime ?? session.t0, t0: session.t0,
     latency: session.latency + s.extraLatency, unitSec, gridDiv: s.gridDiv,
-    barSteps: s.barSteps, pickup: s.pickup, autoAlign: s.autoAlign, final: session.final,
+    barSteps: s.barSteps, pickup: s.pickup, autoAlign: s.autoAlign, final: session.final, track: s.track,
   });
+  lastQ = q;
   let key;
   if (s.keyId !== 'auto') {
     key = keyFromId(s.keyId);
@@ -448,7 +485,8 @@ function regenerate() {
   const parts = [
     t('info.notes', { n: q.noteCount }),
     t('info.latency', { ms: Math.round((session.latency + s.extraLatency) * 1000) }),
-    s.autoAlign ? t('info.shift', { ms: `${q.shiftMs >= 0 ? '+' : ''}${q.shiftMs}` }) : null,
+    q.tempo ? tempoInfo(q.tempo, unitSec) : null,
+    !q.tempo && s.autoAlign ? t('info.shift', { ms: `${q.shiftMs >= 0 ? '+' : ''}${q.shiftMs}` }) : null,
     q.pickupSteps ? t('info.pickup', { n: q.pickupSteps / s.gridDiv }) : t('info.noPickup'),
     state === 'recording' ? t('info.analysis', { ms: transcriber.lastInferMs.toFixed(0), lag: lag.toFixed(1) }) : null,
     t('info.engine', { b: transcriber.backend }),
@@ -456,6 +494,14 @@ function regenerate() {
   ].filter(Boolean);
   el.info.textContent = parts.join(' · ');
   scheduleRender(abc);
+}
+
+// « tempo suivi : blanche = 92 (88–97) » dans l'unité de pulsation choisie.
+function tempoInfo(tempo, unitSec) {
+  const bpm = (u) => Math.round(session.bpm * (unitSec / u));
+  return t('info.tempo', {
+    beat: beatSymbol(session.beat), now: bpm(tempo.unitSecNow), min: bpm(tempo.unitSecMax), max: bpm(tempo.unitSecMin),
+  });
 }
 
 function scheduleRender(abc) {
@@ -478,7 +524,8 @@ function setupSynth(visual) {
     synthControl.load('#synth', null, { displayRestart: true, displayPlay: true, displayProgress: true, displayWarp: true, displayLoop: true });
   }
   const s = readSettings();
-  const barSec = (s.meter.value / session.beat) * (60 / session.bpm);
+  // Tempo de lecture : tempo moyen suivi, sinon celui du métronome.
+  const barSec = lastQ?.tempo ? (s.meter.value / s.unit) * lastQ.tempo.unitSecMean : (s.meter.value / session.beat) * (60 / session.bpm);
   synthControl.setTune(visual, false, { millisecondsPerMeasure: barSec * 1000 }).catch(err => console.warn('synth', err));
 }
 
@@ -495,7 +542,13 @@ function animate() {
   rafId = requestAnimationFrame(animate);
   if (!metronome || !session) return;
   const now = ctx.currentTime - (ctx.outputLatency || 0);
-  const pos = (now - session.t0) / (60 / session.bpm);
+  let pos = (now - session.t0) / (60 / session.bpm);
+  // Clic arrêté : les voyants suivent le tempo de l'interprète (extrapolation du suivi).
+  if (!metronome.clicking() && lastQ?.tempo) {
+    const st = readSettings();
+    pos = lastQ.tempo.toUnits(now - session.t0) * (st.unit / session.beat);
+  }
+  updateClickState();
   const beatsPerBar = session.beatsPerBar;
   const beatIdx = ((Math.floor(pos) % beatsPerBar) + beatsPerBar) % beatsPerBar;
   const frac = pos - Math.floor(pos);

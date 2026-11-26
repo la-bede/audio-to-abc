@@ -164,3 +164,64 @@ Nouveau : `js/i18n.js`. Modifiés : `index.html`, `css/style.css` (sélecteur), 
 2. recordtest : 2 enregistrements, Simplify, bascule de langue, persistance après rechargement, aucune erreur JS.
 3. Captures bureau (1440 px) et mobile (`tests/mobile-preview.html`, 390 px) en EN et en FR : aucun texte français résiduel en mode EN, pas de débordement.
 4. Commit + push sur `main` (avec ton accord, comme les fois précédentes), contrôle que la version en ligne s'affiche en anglais par défaut.
+
+---
+
+# Plan v4 (itération 4) — Suivi du tempo de l'interprète (métronome arrêté après 2 mesures) + liens `?lang=`
+
+## Contexte
+Suivre le métronome sur tout un air est difficile : les petites dérives de l'interprète décalent les barres de mesure. Demandes :
+1. **Par défaut**, le métronome s'arrête après 2 mesures complètes (hors levée) et la transcription **suit les fluctuations de tempo** de l'interprète.
+2. Le **mode actuel** (métronome continu, tempo fixe) reste disponible.
+3. L'utilisateur veut **tester plusieurs options d'arrêt du clic** sur un exemple → elles sont toutes proposées dans un réglage.
+4. Liens par langue : **`?lang=fr` / `?lang=en` uniquement** (ex. https://la-bede.github.io/audio-to-abc/?lang=fr ouvre à coup sûr la page française).
+
+Inspiration Cadence (Batpapa) : tempo estimé par auto-corrélation d'une courbe de nouveauté issue des énergies de hauteur (pour capter les changements de note liés sans attaque), fenêtre 12 s, vote médian sur 5 estimations. **Licence AGPL-3.0** → on reprend des idées, aucun code copié. Notre cas est plus simple : tempo et phase de départ sont **connus** (décompte), et Basic Pitch fournit déjà les débuts de note, y compris liés (« melodia trick ») ; pas besoin d'estimer le tempo à l'aveugle ni de craindre les erreurs ×2/×1.5.
+
+## 1. Réglage « Mode tempo » (`index.html`, `js/i18n.js`)
+Liste déroulante dans la carte Métronome, choix mémorisé :
+- **Suivi — clic arrêté à la fin de la mesure 2** *(défaut)* : arrêt pile à la barre de fin de mesure 2, décidé d'après le **niveau du micro** (début de jeu détecté) ; si l'interprète commence en retard, le compte part de la mesure où il commence.
+- **Suivi — clic arrêté après 2 mesures transcrites** : le clic continue jusqu'à ce que l'ABC contienne 2 mesures complètes, puis s'arrête à la barre suivante (≈ 1-2 mesures de clic en plus à cause du retard d'analyse).
+- **Métronome continu, tempo fixe** : comportement actuel (inchangé, y compris recalage automatique global).
+Le réglage « Clic » (toujours / décompte seulement / visuel) continue de s'appliquer pendant la phase où le métronome tourne.
+Après l'arrêt, changer le mode recalcule l'ABC du même enregistrement (suivi ↔ tempo fixe) pour comparer.
+
+## 2. Suivi du tempo — nouveau `js/tempo.js`
+**`trackTempo(onsets, { unitSec, … })`** (fonction pure, déterministe, appelée à chaque mise à jour sur toutes les notes) :
+- Grille en unités L (croches pour L:1/8). Ancre initiale : temps 1 de la mesure 1 (`t0`, latence compensée), période initiale `T0 = unitSec` du métronome.
+- Boucle à verrouillage de phase sur les débuts de note (après réduction monophonique) : pour chaque onset, position prévue `k = round(idx + (t − tAncre)/T)`, erreur `e`. Si `|e| ≤ 0.3·T` : nouvelle ancre `(k, prévu + α·e)` et période `T += β·e/(k − idxPrécédent)` ; sinon l'onset est ignoré pour le suivi (ornements, triolets, notes très décalées).
+- Garde-fous : période bornée à [0.7·T0, 1.4·T0], variation ≤ 4 % par mise à jour ; gains de départ α = 0.3, β = 0.08 (réglés par les autotests, notamment avec du swing long-court, qui ne doit pas faire osciller la période).
+- Sortie : `toUnits(t)` (temps → position continue en unités L, interpolation linéaire entre ancres, extrapolation avec la période courante avant/après), `unitSecAt(t)`, tempo courant/min/max.
+
+**`PlayDetector`** (même fichier) : niveau RMS par bloc du micro → bruit de fond estimé (médiane) avant le jeu → instant du premier jeu soutenu (seuil relatif + durée minimale ≈ 150 ms, insensible aux clics brefs du métronome). Utilisé par l'option « fin de la mesure 2 ».
+
+## 3. Intégration
+- **`js/quantize.js`** : `quantize(notes, t)` accepte `t.timeMap` (`toUnits`). Sans `timeMap` → comportement actuel (tempo fixe + recalage global). Avec → positions `round(toUnits(t)·gridDiv)`, durées propres `round((toUnits(t+dur) − toUnits(t))·gridDiv)`, pas de recalage global (la phase est suivie). La réduction monophonique, la levée, la fusion des fragments restent identiques ; le tracker est appelé après la réduction monophonique. Retourne en plus les infos de tempo.
+- **`shouldAutoStop`** : la durée de mesure utilisée est celle du tempo suivi courant.
+- **`js/metronome.js`** : `stopAt(time)` (plus aucun clic à partir de cet instant, aligné sur une barre) et `nextDownbeatAfter(time)`.
+- **`js/recorder.js`** : rappel `onLevel(ctxTime, rms)` par bloc (déjà calculé pour le vumètre).
+- **`js/main.js`** :
+  - option 1 : `PlayDetector` alimenté pendant l'enregistrement ; dès le début de jeu détecté → `metronome.stopAt(t0 + (barreDébut + 2)·mesure)` (barreDébut = 0 si le jeu commence pendant le décompte ou la 1re moitié de la mesure 1, règle identique à la levée automatique) ;
+  - option 2 : dès que l'ABC quantifié contient un événement en mesure 3 → `stopAt(prochaine barre)` ;
+  - voyants de pulsation et « Mesure n » : après l'arrêt du clic, ils suivent le tempo suivi (extrapolation du tracker) ;
+  - infos : « tempo suivi : ♩ = 92 (88–97) » ; état du clic exposé dans `body.dataset.click` (`on`/`off`) pour les tests.
+- **Synthèse abcjs** : tempo de lecture = tempo moyen suivi.
+
+## 4. Langue par URL (`js/i18n.js`, `js/main.js`)
+- `?lang=fr|en` dans l'URL : prioritaire sur le choix mémorisé, puis mémorisé.
+- Les boutons EN | FR mettent à jour l'adresse (`history.replaceState`, `?lang=xx`) : l'URL affichée est toujours partageable.
+- Sans paramètre : choix mémorisé, sinon anglais.
+- README (EN + FR) : liens `?lang=en` / `?lang=fr`, et description du nouveau mode tempo.
+
+## Fichiers
+Nouveau : `js/tempo.js`. Modifiés : `js/quantize.js`, `js/metronome.js`, `js/recorder.js`, `js/main.js`, `js/i18n.js`, `index.html`, `tests/selftest.html`, `tests/recordtest.html`, `README.md`, `PLAN.md` (ajout v4).
+
+## Vérification
+1. **Autotests** (`tests/selftest.html`, Chrome headless) — 28 existants + :
+   - reel synthétisé en **accélération** (blanche 90 → 108 sur 8 mesures) : ABC exact avec le suivi, et constat que le mode tempo fixe décale les barres ;
+   - **ralentissement** + léger **swing** (55/45) : ABC exact avec le suivi ;
+   - cas existants (reel, jig, AABB) rejoués en mode suivi : toujours exacts ;
+   - `trackTempo` : tempo final estimé à ±2 % ; `PlayDetector` : bruit + clics brefs → pas de déclenchement, jeu soutenu → déclenchement au bon instant.
+2. **recordtest** (faux micro Chrome) : mode par défaut → `data-click` passe à `off` après ~2 mesures de jeu ; option 2 → arrêt plus tardif ; mode continu → clic jusqu'à la fin ; `?lang=fr` force le français et l'URL suit la bascule de langue ; aucune erreur JS.
+3. Commit + push sur `main`, contrôle de la version en ligne (`?lang=fr`).
+4. Test réel par l'utilisateur : même air joué avec les 3 modes, comparaison des ABC.

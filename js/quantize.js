@@ -1,6 +1,10 @@
 // Quantification : notes en secondes → événements sur la grille rythmique du métronome.
 // Réduit la polyphonie à une mélodie, recale automatiquement le décalage micro/haut-parleur,
 // détecte la levée et calcule les durées (jeu legato : une note dure jusqu'à l'onset suivant).
+// Deux modes : tempo fixe (grille du métronome + recalage global) ou suivi du tempo de l'interprète
+// (grille déformée par trackTempo, cf. tempo.js).
+
+import { trackTempo } from './tempo.js';
 
 /**
  * @param {Array} notes  [{start, dur, midi, amp}] (s depuis le 1er échantillon capté)
@@ -8,6 +12,8 @@
  *   captureStart : temps ctx du 1er échantillon ; t0 : temps ctx du temps 1 de la mesure 1
  *   latency (s) ; unitSec : durée de L ; gridDiv : pas par unité L (1 ou 2)
  *   barSteps : pas par mesure ; pickup : 'auto' | nombre d'unités L ; autoAlign : bool ; final : bool
+ *   track : bool — suivre le tempo de l'interprète (sinon grille fixe du métronome)
+ *   trackOptions : réglages optionnels de trackTempo
  */
 export function quantize(notes, t) {
   const stepSec = t.unitSec / t.gridDiv;
@@ -44,9 +50,16 @@ export function quantize(notes, t) {
   }
   ns = mono;
 
-  // 3. Recalage automatique (moyenne circulaire de la phase des onsets sur la grille L).
+  // 3a. Suivi du tempo : la grille suit les débuts de note de l'interprète.
+  let tracker = null;
+  if (t.track) tracker = trackTempo(ns, { unitSec: t.unitSec, ...(t.trackOptions || {}) });
+  const toSteps = tracker
+    ? (x) => tracker.toUnits(x) * t.gridDiv
+    : (x) => (x - shift) / stepSec;
+
+  // 3b. Tempo fixe : recalage automatique (moyenne circulaire de la phase des onsets sur la grille L).
   let shift = 0;
-  if (t.autoAlign && ns.length >= 6) {
+  if (!tracker && t.autoAlign && ns.length >= 6) {
     let sx = 0, sy = 0, w = 0;
     for (const n of ns) {
       const ph = n.t / t.unitSec;
@@ -63,13 +76,17 @@ export function quantize(notes, t) {
   // 4. Position sur la grille ; une seule note par pas.
   const byPos = new Map();
   for (const n of ns) {
-    const pos = Math.round((n.t - shift) / stepSec);
+    const pos = Math.round(toSteps(n.t));
     if (!forced && pos < -t.barSteps) continue;
     const prev = byPos.get(pos);
     if (!prev || score(n) > score(prev)) byPos.set(pos, { ...n, pos });
   }
   const seq = [...byPos.values()].sort((a, b) => a.pos - b.pos);
-  if (seq.length === 0) return { events: [], pickupSteps: 0, shiftMs: Math.round(shift * 1000), noteCount: 0 };
+  const tempo = tracker ? {
+    unitSecNow: tracker.unitSecNow, unitSecMean: tracker.unitSecMean,
+    unitSecMin: tracker.unitSecMin, unitSecMax: tracker.unitSecMax, toUnits: tracker.toUnits,
+  } : null;
+  if (seq.length === 0) return { events: [], pickupSteps: 0, shiftMs: Math.round(shift * 1000), noteCount: 0, tempo, origin: 0 };
 
   // 5. Origine de la mesure 1 et levée.
   const p0 = seq[0].pos;
@@ -94,7 +111,7 @@ export function quantize(notes, t) {
   for (let i = 0; i < seq.length; i++) {
     const n = seq[i];
     const pos = n.pos - origin;
-    const own = Math.max(1, Math.round(n.dur / stepSec));
+    const own = Math.max(1, Math.round(toSteps(n.t + n.dur) - toSteps(n.t)));
     if (i + 1 < seq.length) {
       const gap = seq[i + 1].pos - n.pos;
       if (gap - own >= restMin) {
@@ -109,7 +126,7 @@ export function quantize(notes, t) {
   }
   const pickupSteps = Math.max(0, -Math.min(...events.map(e => e.pos)));
   for (const e of events) e.onDownbeat = ((e.pos % t.barSteps) + t.barSteps) % t.barSteps === 0;
-  return { events, pickupSteps, shiftMs: Math.round(shift * 1000), noteCount: seq.length };
+  return { events, pickupSteps, shiftMs: Math.round(shift * 1000), noteCount: seq.length, tempo, origin };
 }
 
 function score(n) {

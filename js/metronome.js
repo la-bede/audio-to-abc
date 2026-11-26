@@ -23,6 +23,7 @@ export class Metronome {
     this.startTime = o.startTime;
     this.t0 = o.startTime + o.countInBars * o.beatsPerBar * this.beatSec; // 1er temps de la mesure 1
     this.nextBeat = 0;
+    this.stopTime = Infinity;   // plus aucun clic à partir de cet instant (suivi du tempo)
     this.running = true;
     this.clickTimes = [];
     const tick = () => this._schedule();
@@ -35,6 +36,7 @@ export class Metronome {
     while (this.running) {
       const t = this.startTime + this.nextBeat * this.beatSec;
       if (t > ahead) break;
+      if (t >= this.stopTime - 1e-6) { this.stop(); break; }
       const inCountIn = this.nextBeat < this.o.countInBars * this.o.beatsPerBar;
       const accent = this.nextBeat % this.o.beatsPerBar === 0;
       const audible = this.o.sound === 'always' || (this.o.sound === 'countin' && inCountIn);
@@ -56,6 +58,23 @@ export class Metronome {
     osc.connect(g).connect(this.out);
     osc.start(t);
     osc.stop(t + 0.05);
+  }
+
+  // Arrête les clics à partir de `time` (en général une barre de mesure). Sans effet si déjà dépassé.
+  stopAt(time) {
+    if (time < this.stopTime) this.stopTime = Math.max(time, this.ctx.currentTime);
+  }
+
+  // Première barre de mesure (temps 1) strictement après `time`.
+  nextDownbeatAfter(time) {
+    const barSec = this.o.beatsPerBar * this.beatSec;
+    const n = Math.floor((time - this.t0) / barSec) + 1;
+    return this.t0 + n * barSec;
+  }
+
+  // Le métronome clique-t-il encore à l'instant `time` ?
+  clicking(time = this.ctx.currentTime) {
+    return this.running && time < this.stopTime;
   }
 
   // Position musicale courante (en pulsations depuis t0, négative pendant le décompte).

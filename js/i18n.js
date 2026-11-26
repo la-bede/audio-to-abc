@@ -46,6 +46,10 @@ const DICT = {
     'f.autoStopN1': 'after 1 silent bar',
     'f.autoStopN': 'after {n} silent bars',
     'f.instrument': 'Instrument',
+    'f.tempoMode': 'Tempo mode',
+    'f.tempoTrackLevel': 'Follow my tempo — click stops after bar 2',
+    'f.tempoTrackAbc': 'Follow my tempo — click stops after 2 transcribed bars',
+    'f.tempoFixed': 'Continuous metronome, fixed tempo',
     'f.advanced': 'Advanced settings (NeuralNote / Basic Pitch detection)',
     'f.noteSens': 'Note sensitivity:',
     'f.splitSens': 'Split sensitivity:',
@@ -93,6 +97,7 @@ const DICT = {
     'info.noPickup': 'no pickup',
     'info.analysis': 'analysis: {ms} ms / window, lag {lag} s',
     'info.engine': 'engine {b}',
+    'info.tempo': 'tempo followed: {beat} = {now} ({min}–{max})',
     'info.autoStopped1': 'automatic stop after 1 bar without notes',
     'info.autoStopped': 'automatic stop after {n} bars without notes',
     'info.badMeter': 'Invalid meter or note length (expected format: 6/8).',
@@ -159,6 +164,10 @@ const DICT = {
     'f.autoStopN1': 'après 1 mesure de silence',
     'f.autoStopN': 'après {n} mesures de silence',
     'f.instrument': 'Instrument',
+    'f.tempoMode': 'Mode tempo',
+    'f.tempoTrackLevel': 'Suivre mon tempo — clic arrêté après la mesure 2',
+    'f.tempoTrackAbc': 'Suivre mon tempo — clic arrêté après 2 mesures transcrites',
+    'f.tempoFixed': 'Métronome continu, tempo fixe',
     'f.advanced': 'Réglages avancés (détection NeuralNote / Basic Pitch)',
     'f.noteSens': 'Sensibilité notes :',
     'f.splitSens': 'Sensibilité séparation :',
@@ -206,6 +215,7 @@ const DICT = {
     'info.noPickup': 'pas de levée',
     'info.analysis': 'analyse : {ms} ms / fenêtre, retard {lag} s',
     'info.engine': 'moteur {b}',
+    'info.tempo': 'tempo suivi : {beat} = {now} ({min}–{max})',
     'info.autoStopped1': 'arrêt automatique après 1 mesure sans note',
     'info.autoStopped': 'arrêt automatique après {n} mesures sans note',
     'info.badMeter': 'Métrique ou note de base invalide (format attendu : 6/8).',
@@ -238,7 +248,26 @@ function readStored() {
   } catch (_) { return null; }
 }
 
-let lang = readStored() || 'en';
+// Langue imposée par l'adresse (?lang=fr / ?lang=en) : prioritaire, puis mémorisée.
+function readUrl() {
+  try {
+    const v = new URLSearchParams(window.location.search).get('lang');
+    return LANGS.includes(v) ? v : null;
+  } catch (_) { return null; }
+}
+
+const fromUrl = readUrl();
+let lang = fromUrl || readStored() || 'en';
+if (fromUrl) { try { localStorage.setItem(STORAGE_KEY, fromUrl); } catch (_) { /* stockage indisponible */ } }
+
+/** Met l'adresse affichée en accord avec la langue (?lang=xx), sans recharger la page. */
+export function syncUrl() {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('lang', lang);
+    window.history.replaceState(null, '', url);
+  } catch (_) { /* adresse non modifiable (aperçu, iframe…) */ }
+}
 
 export function getLang() { return lang; }
 

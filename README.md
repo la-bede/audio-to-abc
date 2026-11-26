@@ -3,6 +3,8 @@
 [English](#english) · [Français](#français)
 
 **Live version: https://la-bede.github.io/audio-to-abc/**
+— in English: https://la-bede.github.io/audio-to-abc/?lang=en
+— en français : https://la-bede.github.io/audio-to-abc/?lang=fr
 (self-tests: https://la-bede.github.io/audio-to-abc/tests/selftest.html)
 
 ---
@@ -23,7 +25,8 @@ browser, so the page runs the same model with TensorFlow.js and exposes its dete
 > pub, several instruments at once, background conversation).
 
 The interface is in **English by default**. The **EN | FR** switch at the top right changes the
-language, and the browser remembers the choice.
+language, and the browser remembers the choice. A link ending in `?lang=fr` (or `?lang=en`) always
+opens the page in that language; the address follows the switch, so it can be shared as is.
 
 ### Usage
 
@@ -31,7 +34,7 @@ language, and the browser remembers the choice.
    slip jig, hornpipe, polka, slide, waltz, barndance, strathspey, three-two, mazurka and march.
    With **Custom…**, you enter M: and L: yourself.
 2. Set the **tempo**, the **count-in** (2 bars by default) and the **pickup**. In *Auto* mode, notes
-   played during the last count-in bar become the pickup.
+   played during the last count-in bar become the pickup. Choose the **tempo mode** (see below).
 3. **Key**: *Auto* detects it (major, minor, dorian, mixolydian). You can also set it
    (thesession format: Dmajor, Ador…).
 4. Click **Record**, then play after the count-in. Headphones are advised; otherwise choose the
@@ -47,6 +50,25 @@ language, and the browser remembers the choice.
 
 If notes are consistently early or late, adjust *Advanced settings → Extra latency*. *Automatic
 alignment* already corrects small offsets.
+
+#### Tempo mode
+
+Keeping to a metronome through a whole tune is hard, and small drifts shift the bar lines. By
+default the metronome therefore only gives the start, and the transcription then **follows the
+player's tempo**:
+
+- **Follow my tempo — click stops after bar 2** (default): the click stops exactly at the end of
+  the 2nd bar (pickup excluded). The start of playing is detected from the microphone level; if you
+  start late, bars are counted from where you start.
+- **Follow my tempo — click stops after 2 transcribed bars**: the click goes on until the ABC
+  contains 2 complete bars, then stops at the next bar line (about 1 to 2 extra bars of click,
+  because of the analysis lag).
+- **Continuous metronome, fixed tempo**: the click goes on until the end and the grid stays fixed.
+
+Tempo following uses a phase-locked loop on the note onsets found by Basic Pitch (slurred notes
+included), starting from the metronome's tempo and phase. The tempo followed is shown under the ABC
+(for example “half note = 92 (88–97)”). After recording, switching the mode recomputes the ABC of
+the same recording, so both can be compared.
 
 #### Simplification (repeats and voltas)
 
@@ -90,7 +112,9 @@ Then open http://localhost:8000.
   - unit tests of the simplification (repeats; voltas on 1, 2, 3→4 and 4 bars; one round;
     tolerance; summaries in English and French) and of the automatic stop;
   - synthesised tunes transcribed and compared with the expected ABC: a reel with a pickup, a jig
-    with accidentals, and an AABB reel that is then simplified. No microphone needed.
+    with accidentals, and an AABB reel that is then simplified, each in both tempo modes; plus a
+    reel that speeds up (half note 90 → 108) and one that slows down with swing, which only tempo
+    following transcribes correctly. No microphone needed.
 - `tests/recordtest.html` drives the full page: default language, EN/FR switch remembered after a
   reload, two successive recordings, then the Simplify button. Meant for Chrome started with
   `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`.
@@ -119,6 +143,7 @@ js/recorder.js          microphone → AudioWorklet → 22,050 Hz, + MediaRecord
 js/worklet-capture.js   AudioWorkletProcessor
 js/transcriber.js       Basic Pitch on sliding windows + incremental notes
 js/quantize.js          melody, alignment, grid, pickup, durations, automatic stop
+js/tempo.js             tempo following (phase-locked loop) and start-of-playing detection
 js/key.js               thesession keys, spelling, detection
 js/abc.js               ABC writing (thesession style): bars + linear layout
 js/structure.js         simplification: repeats, voltas, one round
@@ -130,7 +155,7 @@ tests/                  self-tests
 
 Planned for a later version:
 
-- tempo tracking without a metronome;
+- tempo following without any count-in (the starting tempo still comes from the metronome);
 - audio file import.
 
 Also:
@@ -156,7 +181,9 @@ de détection (sensibilité des notes, sensibilité de séparation, durée minim
 > bruyant (session dans un pub, plusieurs instruments à la fois, conversations autour).
 
 L'interface est **en anglais par défaut**. Le sélecteur **EN | FR** en haut à droite change la
-langue, et le navigateur retient le choix.
+langue, et le navigateur retient le choix. Un lien qui se termine par `?lang=fr` (ou `?lang=en`)
+ouvre toujours la page dans cette langue ; l'adresse suit le sélecteur, on peut donc la partager
+telle quelle.
 
 ### Utilisation
 
@@ -164,7 +191,8 @@ langue, et le navigateur retient le choix.
    reel, jig, slip jig, hornpipe, polka, slide, waltz, barndance, strathspey, three-two, mazurka et
    march. Avec **Perso…**, on saisit M: et L: soi-même.
 2. Régler le **tempo**, le **décompte** (2 mesures par défaut) et la **levée**. En mode *Auto*, les
-   notes jouées dans la dernière mesure du décompte deviennent la levée.
+   notes jouées dans la dernière mesure du décompte deviennent la levée. Choisir le **mode tempo**
+   (voir ci-dessous).
 3. **Tonalité** : *Auto* la détecte (majeur, mineur, dorien, mixolydien). On peut aussi en imposer
    une (format thesession : Dmajor, Ador…).
 4. **Enregistrer**, puis jouer après le décompte. Un casque est conseillé, sinon choisir le clic
@@ -182,6 +210,25 @@ langue, et le navigateur retient le choix.
 
 Si les notes tombent systématiquement en avance ou en retard, ajuster *Réglages avancés → Latence
 supplémentaire*. Le *recalage automatique* corrige déjà les petits décalages.
+
+#### Mode tempo
+
+Suivre un métronome sur tout un air est difficile, et les petites dérives décalent les barres de
+mesure. Par défaut, le métronome ne donne donc que le départ, puis la transcription **suit le tempo
+de l'interprète** :
+
+- **Suivre mon tempo — clic arrêté après la mesure 2** (défaut) : le clic s'arrête pile à la fin de
+  la 2e mesure (hors levée). Le début de jeu est détecté d'après le niveau du micro ; si on commence
+  en retard, les mesures sont comptées à partir du début de jeu.
+- **Suivre mon tempo — clic arrêté après 2 mesures transcrites** : le clic continue jusqu'à ce que
+  l'ABC contienne 2 mesures complètes, puis s'arrête à la barre suivante (environ 1 à 2 mesures de
+  clic en plus, à cause du retard d'analyse).
+- **Métronome continu, tempo fixe** : le clic continue jusqu'à la fin et la grille reste fixe.
+
+Le suivi du tempo est une boucle à verrouillage de phase sur les débuts de note trouvés par Basic
+Pitch (notes liées comprises), qui part du tempo et de la phase du métronome. Le tempo suivi
+s'affiche sous l'ABC (par exemple « blanche = 92 (88–97) »). Après l'enregistrement, changer de
+mode recalcule l'ABC du même enregistrement, ce qui permet de comparer.
 
 #### Simplification (reprises et voltas)
 
@@ -227,7 +274,9 @@ Puis ouvrir http://localhost:8000.
   - tests unitaires de la simplification (reprises ; voltas sur 1, 2, 3→4 et 4 mesures ; un seul
     tour ; tolérance ; résumés en anglais et en français) et de l'arrêt automatique ;
   - airs synthétisés, transcrits puis comparés à l'ABC attendu : un reel avec levée, une jig avec
-    accidents, et un reel AABB qui est ensuite simplifié. Aucun micro n'est nécessaire.
+    accidents, et un reel AABB qui est ensuite simplifié, chacun dans les deux modes tempo ; plus un
+    reel qui accélère (blanche 90 → 108) et un qui ralentit avec du swing, que seul le suivi du tempo
+    transcrit correctement. Aucun micro n'est nécessaire.
 - `tests/recordtest.html` pilote la page complète : langue par défaut, bascule EN/FR retenue après
   rechargement, deux enregistrements successifs, puis le bouton Simplifier. Il est prévu pour Chrome
   lancé avec `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`.
@@ -256,6 +305,7 @@ js/recorder.js          micro → AudioWorklet → 22 050 Hz, + MediaRecorder
 js/worklet-capture.js   AudioWorkletProcessor
 js/transcriber.js       Basic Pitch en fenêtres glissantes + notes incrémentales
 js/quantize.js          mélodie, recalage, grille, levée, durées, arrêt automatique
+js/tempo.js             suivi du tempo (boucle à verrouillage de phase), détection du début de jeu
 js/key.js               tonalités thesession, orthographe, détection
 js/abc.js               écriture ABC (style thesession) : mesures + mise en page linéaire
 js/structure.js         simplification : reprises, voltas, un seul tour
@@ -267,7 +317,7 @@ tests/                  autotests
 
 Les points suivants sont prévus pour une version ultérieure :
 
-- le suivi du tempo sans métronome ;
+- le suivi du tempo sans aucun décompte (le tempo de départ vient toujours du métronome) ;
 - l'import de fichiers audio.
 
 Par ailleurs :

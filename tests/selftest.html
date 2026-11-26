@@ -23,6 +23,7 @@
     import { renderBars, layoutLinear } from '../js/abc.js';
     import { simplify, layoutSimplified } from '../js/structure.js';
     import { getLang, setLang } from '../js/i18n.js';
+    import { trackTempo, PlayDetector } from '../js/tempo.js';
 
     const out = document.getElementById('out');
     const report = location.search.includes('report');
@@ -88,6 +89,32 @@
     check('bruit avant le décompte ignoré', shouldAutoStop({ ...base, notes: [n(-1, 0.2)], analyzedSec: 30 }).stop, false);
     check('arrêt auto désactivé', shouldAutoStop({ ...base, bars: 0, notes: [n(3, 2)], analyzedSec: 30 }).stop, false);
 
+    log('\n=== Suivi du tempo (trackTempo) et détection du début de jeu ===');
+    {
+      // Une note par croche, tempo qui accélère de 20 % sur 64 croches.
+      const T0 = 0.15, U = 64, on = [];
+      let tt = 0;
+      for (let u = 0; u < U; u++) { on.push({ t: tt }); tt += T0 * (1 - 0.2 * u / U); }
+      const tr = trackTempo(on, { unitSec: T0 });
+      const trueEnd = T0 * (1 - 0.2 * (U - 1) / U);
+      const errPct = Math.abs(tr.unitSecNow / trueEnd - 1) * 100;
+      log(`  période finale estimée ${(tr.unitSecNow * 1000).toFixed(1)} ms, vraie ${(trueEnd * 1000).toFixed(1)} ms (écart ${errPct.toFixed(1)} %)`);
+      check('accélération 20 % : période finale à ±2 %', errPct <= 2, true);
+      check('accélération 20 % : dernière note sur la bonne croche', Math.round(tr.toUnits(on[U - 1].t)), U - 1);
+      const steady = trackTempo(Array.from({ length: 32 }, (_, i) => ({ t: i * T0 })), { unitSec: T0 });
+      check('tempo stable : période inchangée', Math.abs(steady.unitSecNow / T0 - 1) < 0.005, true);
+
+      const det = new PlayDetector();
+      let start = null;
+      for (let i = 0; i < 120; i++) {               // blocs de ~43 ms
+        const time = i * 0.0427;
+        const click = i % 12 === 0 ? 0.08 : 0;      // clic bref toutes les ~0,5 s
+        const play = time >= 3.0 ? 0.03 : 0;        // jeu à partir de 3,0 s
+        start = det.push(time, Math.max(0.001, click, play));
+      }
+      check('début de jeu : clics brefs ignorés, jeu détecté à 3,0 s', start !== null && Math.abs(start - 3.0) < 0.05, true);
+    }
+
     // ---------------------------------------------------------------- 2. Audio synthétisé
     // (midi, durée en croches)
     const bar1 = [[74, 2], [78, 1], [74, 1], [69, 2], [66, 1], [69, 1]];                 // d2fd A2FA
@@ -97,6 +124,8 @@
     const bar5 = [[76, 2], [78, 1], [76, 1], [74, 2], [73, 1], [71, 1]];                  // e2fe d2cB
     const bar6 = [[69, 1], [71, 1], [73, 1], [74, 1], [76, 4]];                           // ABcd e4
     const bar8 = [[71, 1], [67, 1], [66, 1], [64, 1], [62, 4]];                           // BGFE D4
+    // Cas avec tempo variable : `tempo` = facteur de durée des croches au début et à la fin (1 = métronome),
+    // `swing` = croches inégales (0,1 → 55/45). Le mode tempo fixe y décale les barres (affiché pour info).
     const CASES = [
       {
         name: 'Reel en ré (levée)', M: '4/4', rhythm: 'reel', eighth: 0.15, barSteps: 8, groupSteps: 4, keyAbc: 'Dmaj', pickupFirst: true,
@@ -117,17 +146,41 @@
           + 'e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4|e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4|]',
         simplified: '|:d2fd A2FA|dfed cABc|d2fd A2FA|1 BGFE D2FA:|2 BGFE D2A2||\n|:e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4:|',
       },
+      {
+        name: 'Reel qui accélère (blanche 90 → 108)', M: '4/4', rhythm: 'reel', eighth: 60 / 90 / 4, barSteps: 8, groupSteps: 4, keyAbc: 'Dmaj',
+        tempo: { start: 1, end: 90 / 108, swing: 0 }, trackOnly: true,
+        tune: [...bar1, ...bar2, ...bar1, ...bar4a, ...bar1, ...bar2, ...bar1, ...bar8],
+        expected: 'd2fd A2FA|dfed cABc|d2fd A2FA|BGFE D2FA|d2fd A2FA|dfed cABc|d2fd A2FA|BGFE D4|]',
+      },
+      {
+        name: 'Reel qui ralentit avec swing 55/45 (levée)', M: '4/4', rhythm: 'reel', eighth: 0.15, barSteps: 8, groupSteps: 4, keyAbc: 'Dmaj',
+        pickupFirst: true, tempo: { start: 1, end: 1.15, swing: 0.1 }, trackOnly: true,
+        tune: [[69, 1], ...bar1, ...bar2, ...bar1, ...bar4a, ...bar1, ...bar2, ...bar1, ...bar8],
+        expected: 'A|d2fd A2FA|dfed cABc|d2fd A2FA|BGFE D2FA|d2fd A2FA|dfed cABc|d2fd A2FA|BGFE D4|]',
+      },
     ];
     const t0 = 1.0;       // temps 1 de la mesure 1 dans le fichier
     const SR = 22050;
 
-    async function synth(tune, eighth, pickupFirst) {
-      const total = t0 + tune.reduce((a, [, len]) => a + len, 0) * eighth + 1.0;
+    async function synth(tune, eighth, pickupFirst, tempo) {
+      // Instants des croches : tempo qui évolue linéairement + swing éventuel.
+      const units = tune.reduce((a, [, len]) => a + len, 0);
+      const at = [0];
+      for (let u = 0; u < units; u++) {
+        const f = tempo ? tempo.start + (tempo.end - tempo.start) * u / units : 1;
+        const sw = tempo?.swing || 0;
+        const pu = pickupFirst ? u - 1 : u;          // parité par rapport au temps 1 de la mesure 1
+        at.push(at[u] + eighth * f * (((pu % 2) + 2) % 2 === 0 ? 1 + sw : 1 - sw));
+      }
+      const origin = pickupFirst ? t0 - at[1] : t0; // la levée commence une croche avant t0
+      const total = origin + at[units] + 1.0;
       const oc = new OfflineAudioContext(1, Math.ceil(total * SR), SR);
-      let t = pickupFirst ? t0 - eighth : t0; // la levée commence une croche avant t0
+      let u = 0;
       for (const [midi, len] of tune) {
         const f = 440 * 2 ** ((midi - 69) / 12);
-        const d = len * eighth;
+        const t = origin + at[u];
+        const d = at[u + len] - at[u];
+        u += len;
         const o = oc.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
         const lp = oc.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2500;
         const g = oc.createGain();
@@ -137,7 +190,6 @@
         g.gain.linearRampToValueAtTime(0, t + d - 0.005);
         o.connect(lp).connect(g).connect(oc.destination);
         o.start(t); o.stop(t + d);
-        t += d;
       }
       return (await oc.startRendering()).getChannelData(0);
     }
@@ -150,7 +202,7 @@
       for (const c of CASES) {
         log(`\n=== ${c.name} ===`);
         tr.reset();
-        const audio = await synth(c.tune, c.eighth, c.pickupFirst);
+        const audio = await synth(c.tune, c.eighth, c.pickupFirst, c.tempo);
         // Simulation du flux temps réel : blocs de 2048 échantillons, analyse au fil de l'eau.
         for (let i = 0; i < audio.length; i += 2048) {
           tr.push(audio.subarray(i, i + 2048));
@@ -160,17 +212,28 @@
         const notes = tr.notes(p, true);
         log(`Notes détectées : ${notes.length} (dernière inférence ${tr.lastInferMs.toFixed(0)} ms)`);
         if (debug) log(notes.map(x => `${x.midi}@${x.start.toFixed(2)}+${x.dur.toFixed(2)}`).join(' '));
-        const q = quantize(notes, { captureStart: 0, t0, latency: 0, unitSec: c.eighth, gridDiv: 1, barSteps: c.barSteps,
-          pickup: 'auto', autoAlign: true, final: true });
-        const last = [...q.events].reverse().find(e => e.midi != null);
-        const key = detectKey(q.events, { finalPc: last.midi % 12 });
-        log(`Recalage ${q.shiftMs} ms, levée ${q.pickupSteps}, tonalité ${key.session}`);
-        const r = renderBars({ events: q.events, barSteps: c.barSteps, gridDiv: 1, groupSteps: c.groupSteps, key,
-          header: { title: c.name, rhythm: c.rhythm, M: c.M, L: '1/8' } });
-        const abc = layoutLinear(r, 4, true);
-        log(abc);
-        check(`${c.name} — tonalité`, key.abc, c.keyAbc);
-        check(`${c.name} — ABC linéaire`, abc.trim().split('\n').slice(6).join(''), c.expected);
+        // Les deux modes : tempo fixe (métronome continu) et suivi du tempo de l'interprète.
+        let r = null, key = null;
+        for (const track of [false, true]) {
+          const q = quantize(notes, { captureStart: 0, t0, latency: 0, unitSec: c.eighth, gridDiv: 1, barSteps: c.barSteps,
+            pickup: 'auto', autoAlign: true, final: true, track });
+          const last = [...q.events].reverse().find(e => e.midi != null);
+          key = detectKey(q.events, { finalPc: last.midi % 12 });
+          const rr = renderBars({ events: q.events, barSteps: c.barSteps, gridDiv: 1, groupSteps: c.groupSteps, key,
+            header: { title: c.name, rhythm: c.rhythm, M: c.M, L: '1/8' } });
+          const abc = layoutLinear(rr, 4, true);
+          const bodyAbc = abc.trim().split('\n').slice(6).join('');
+          const mode = track ? 'suivi du tempo' : 'tempo fixe';
+          const tempoTxt = q.tempo ? `, croche ${(q.tempo.unitSecMax * 1000).toFixed(0)}→${(q.tempo.unitSecNow * 1000).toFixed(0)} ms` : `, recalage ${q.shiftMs} ms`;
+          log(`[${mode}] levée ${q.pickupSteps}, tonalité ${key.session}${tempoTxt}\n${bodyAbc}`);
+          if (track || !c.trackOnly) {
+            check(`${c.name} — ${mode} — tonalité`, key.abc, c.keyAbc);
+            check(`${c.name} — ${mode} — ABC linéaire`, bodyAbc, c.expected);
+          } else {
+            log(`  (tempo fixe : ${bodyAbc === c.expected ? 'identique' : 'barres décalées, comme attendu'})`);
+          }
+          if (track) r = rr;
+        }
         if (c.simplified) {
           const res = simplify(r.bars, { tolerance: 0 });
           const sabc = layoutSimplified(r, res, 4);
