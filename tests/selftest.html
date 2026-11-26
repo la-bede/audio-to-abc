@@ -20,7 +20,8 @@
     import { Transcriber } from '../js/transcriber.js';
     import { quantize, shouldAutoStop } from '../js/quantize.js';
     import { detectKey } from '../js/key.js';
-    import { renderBars, layoutLinear, clipboardPayload } from '../js/abc.js';
+    import { renderBars, layoutLinear, clipboardPayload, setHeaderField } from '../js/abc.js';
+    import { defaultGroup, parseFraction } from '../js/tunetypes.js';
     import { simplify, layoutSimplified } from '../js/structure.js';
     import { getLang, setLang } from '../js/i18n.js';
     import { trackTempo, PlayDetector } from '../js/tempo.js';
@@ -95,6 +96,33 @@
       check('texte : fins de ligne \\r\\n', cp.plain, 'X: 1\r\nT: A<B & C\r\nK: Dmaj\r\n|:d2fd A2FA:|\r\n');
       check('HTML : un paragraphe par ligne', (cp.html.match(/<p /g) || []).length, 4);
       check('HTML : caractères échappés', cp.html.includes('T: A&lt;B &amp; C'), true);
+    }
+
+    log('\n=== En-tête T: / R: après l\'enregistrement (setHeaderField) ===');
+    {
+      const abc = 'X: 1\nT: Sans titre\nM: 4/4\nL: 1/8\nK: Dmaj\nd2fd A2FA|dfed cABc|% retouche\n';
+      const withR = setHeaderField(abc, 'R', 'reel');
+      check('R: ajouté après T:', withR.split('\n').slice(0, 4).join(' | '), 'X: 1 | T: Sans titre | R: reel | M: 4/4');
+      check('T: remplacé, corps retouché conservé', setHeaderField(withR, 'T', 'The Silver Spear'),
+        'X: 1\nT: The Silver Spear\nR: reel\nM: 4/4\nL: 1/8\nK: Dmaj\nd2fd A2FA|dfed cABc|% retouche\n');
+      check('R: vide → ligne retirée', setHeaderField(withR, 'R', ''), abc);
+      check('R: ajouté après le dernier T: (titres alternatifs)',
+        setHeaderField('X: 1\nT: A\nT: B\nM: 6/8\nK: G\nGAB|\n', 'R', 'jig'), 'X: 1\nT: A\nT: B\nR: jig\nM: 6/8\nK: G\nGAB|\n');
+      check('pas de R: dans le corps (après K:)', setHeaderField('X: 1\nT: A\nK: G\nR: x\n', 'R', ''), 'X: 1\nT: A\nK: G\nR: x\n');
+    }
+
+    log('\n=== Groupement des notes selon la métrique (ancien réglage par type) ===');
+    {
+      const g = (m, l = '1/8') => defaultGroup(parseFraction(m), parseFraction(l).value);
+      check('4/4 (reel, hornpipe…) : 4 croches', g('4/4'), 4);
+      check('6/8 (jig) : 3', g('6/8'), 3);
+      check('9/8 (slip jig) : 3', g('9/8'), 3);
+      check('12/8 (slide) : 3', g('12/8'), 3);
+      check('2/4 (polka) : 2', g('2/4'), 2);
+      check('3/4 (waltz, mazurka) : 2', g('3/4'), 2);
+      check('3/2 (three-two) : 4', g('3/2'), 4);
+      check('3/8 (bourrée) : 3', g('3/8'), 3);
+      check('4/4 en L:1/16 : 8', g('4/4', '1/16'), 8);
     }
 
     log('\n=== Suivi du tempo (trackTempo) et détection du début de jeu ===');

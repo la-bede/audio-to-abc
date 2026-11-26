@@ -7,25 +7,25 @@
   <meta name="theme-color" content="#1f3a34">
   <title>Audio → ABC</title>
   <link rel="stylesheet" href="vendor/abcjs/abcjs-audio.css">
-  <link rel="stylesheet" href="css/style.css?v=8">
+  <link rel="stylesheet" href="css/style.css?v=9">
   <!-- Version des fichiers (?v=…) : à incrémenter à chaque mise en ligne, pour qu'un navigateur
        ne mélange jamais une nouvelle page avec d'anciens scripts gardés en cache. -->
   <script type="importmap">
     {
       "imports": {
         "@tensorflow/tfjs": "./vendor/tfjs/tf.fesm.min.js",
-        "./js/main.js": "./js/main.js?v=8",
-        "./js/i18n.js": "./js/i18n.js?v=8",
-        "./js/tempo.js": "./js/tempo.js?v=8",
-        "./js/cursor.js": "./js/cursor.js?v=8",
-        "./js/tunetypes.js": "./js/tunetypes.js?v=8",
-        "./js/metronome.js": "./js/metronome.js?v=8",
-        "./js/recorder.js": "./js/recorder.js?v=8",
-        "./js/transcriber.js": "./js/transcriber.js?v=8",
-        "./js/quantize.js": "./js/quantize.js?v=8",
-        "./js/key.js": "./js/key.js?v=8",
-        "./js/abc.js": "./js/abc.js?v=8",
-        "./js/structure.js": "./js/structure.js?v=8"
+        "./js/main.js": "./js/main.js?v=9",
+        "./js/i18n.js": "./js/i18n.js?v=9",
+        "./js/tempo.js": "./js/tempo.js?v=9",
+        "./js/cursor.js": "./js/cursor.js?v=9",
+        "./js/tunetypes.js": "./js/tunetypes.js?v=9",
+        "./js/metronome.js": "./js/metronome.js?v=9",
+        "./js/recorder.js": "./js/recorder.js?v=9",
+        "./js/transcriber.js": "./js/transcriber.js?v=9",
+        "./js/quantize.js": "./js/quantize.js?v=9",
+        "./js/key.js": "./js/key.js?v=9",
+        "./js/abc.js": "./js/abc.js?v=9",
+        "./js/structure.js": "./js/structure.js?v=9"
       }
     }
   </script>
@@ -67,28 +67,23 @@
 
           <h2 data-i18n="h.tune">The tune</h2>
           <div class="grid">
-            <label class="wide"><span data-i18n="f.title">Title (T:)</span>
-              <input id="title" type="text" value="" placeholder="Untitled" data-i18n-attr="placeholder:untitled" autocomplete="off">
-            </label>
-            <label><span data-i18n="f.type">Type</span>
-              <select id="tuneType"></select>
-            </label>
             <label><span data-i18n="f.meter">Meter (M:)</span>
-              <input id="meter" type="text" inputmode="numeric" value="4/4" pattern="\d+/\d+">
-            </label>
-            <label><span data-i18n="f.unit">Note length (L:)</span>
-              <select id="unitL">
-                <option value="1/8">1/8</option>
-                <option value="1/4">1/4</option>
-                <option value="1/16">1/16</option>
-              </select>
+              <!-- Liste ouverte : « 4/4 — reel, hornpipe… » ; liste fermée : la métrique seule (calque). -->
+              <span class="select-wrap">
+                <select id="meterPreset"></select>
+                <span id="meterValue" class="select-value" aria-hidden="true">4/4</span>
+              </span>
             </label>
             <label><span data-i18n="f.key">Key (K:)</span>
               <select id="keySelect"><option value="auto" data-i18n="f.keyAuto">Auto (detect)</option></select>
             </label>
+            <label id="meterCustomBox" hidden><span data-i18n="f.meterCustom">Other meter (M:)</span>
+              <input id="meter" type="text" inputmode="numeric" value="4/4" pattern="\d+/\d+" placeholder="5/8">
+            </label>
           </div>
 
-          <h2 data-i18n="h.metronome">Metronome</h2>
+          <!-- « Métronome de départ » avec les modes « Suivre mon tempo » (défaut), « Métronome » en tempo fixe. -->
+          <h2 id="metronomeTitle">Start-only metronome</h2>
           <div class="grid">
             <label><span id="tempoLabel">Tempo (half note) =</span>
               <input id="bpm" type="number" min="30" max="240" step="1" value="90" inputmode="numeric">
@@ -96,63 +91,59 @@
             <label><span data-i18n="f.beat">Beat</span>
               <select id="beat"></select>
             </label>
-            <label><span data-i18n="f.countIn">Count-in (bars)</span>
-              <select id="countIn">
-                <option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option>
-              </select>
-            </label>
-            <label><span data-i18n="f.pickup">Pickup</span>
-              <select id="pickup">
-                <option value="auto" selected>Auto</option>
-                <option value="0">None</option>
-                <option value="1">1 × L</option>
-                <option value="2">2 × L</option>
-                <option value="3">3 × L</option>
-                <option value="4">4 × L</option>
-              </select>
-            </label>
-            <label><span data-i18n="f.click">Click</span>
-              <select id="clickMode">
-                <option value="always" selected data-i18n="f.clickAlways">Always (headphones advised)</option>
-                <option value="countin" data-i18n="f.clickCountin">Count-in only</option>
-                <option value="off" data-i18n="f.clickOff">Visual only</option>
-              </select>
-            </label>
-            <label class="wide"><span data-i18n="f.tempoMode">Tempo mode</span>
-              <select id="tempoMode">
-                <option value="track-abc" selected data-i18n="f.tempoTrackAbc">Follow my tempo — click stops after 2 transcribed bars</option>
-                <option value="track-level" data-i18n="f.tempoTrackLevel">Follow my tempo — click stops after bar 2</option>
-                <option value="fixed" data-i18n="f.tempoFixed">Continuous metronome, fixed tempo</option>
-              </select>
-            </label>
-            <label><span data-i18n="f.autoStop">Auto stop</span>
-              <select id="autoStop">
-                <option value="0">Off</option>
-                <option value="1">after 1 silent bar</option>
-                <option value="2" selected>after 2 silent bars</option>
-                <option value="4">after 4 silent bars</option>
-              </select>
-            </label>
-            <label><span data-i18n="f.instrument">Instrument</span>
-              <select id="instrument"></select>
-            </label>
           </div>
           <input id="bpmRange" type="range" min="30" max="240" step="1" value="90" aria-label="Tempo">
 
           <details class="advanced">
-            <summary data-i18n="f.advanced">Advanced settings (NeuralNote / Basic Pitch detection)</summary>
+            <summary data-i18n="f.advanced">Advanced settings</summary>
+            <h3 data-i18n="h.metronomeAdv">Metronome and recording</h3>
             <div class="grid">
-              <label><span><span data-i18n="f.noteSens">Note sensitivity:</span> <output id="noteSensOut">0.50</output></span>
-                <input id="noteSens" type="range" min="0.05" max="0.95" step="0.05" value="0.5">
+              <label><span data-i18n="f.countIn">Count-in (bars)</span>
+                <select id="countIn">
+                  <option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option>
+                </select>
               </label>
-              <label><span><span data-i18n="f.splitSens">Split sensitivity:</span> <output id="splitSensOut">0.70</output></span>
-                <input id="splitSens" type="range" min="0.05" max="0.95" step="0.05" value="0.7">
+              <label><span data-i18n="f.pickup">Pickup</span>
+                <select id="pickup">
+                  <option value="auto" selected>Auto</option>
+                  <option value="0">None</option>
+                  <option value="1">1 × L</option>
+                  <option value="2">2 × L</option>
+                  <option value="3">3 × L</option>
+                  <option value="4">4 × L</option>
+                </select>
               </label>
-              <label><span><span data-i18n="f.minNote">Min. note length:</span> <output id="minNoteOut">60 ms</output></span>
-                <input id="minNote" type="range" min="20" max="200" step="5" value="60">
+              <label><span data-i18n="f.click">Click</span>
+                <select id="clickMode">
+                  <option value="always" selected data-i18n="f.clickAlways">Always (headphones advised)</option>
+                  <option value="countin" data-i18n="f.clickCountin">Count-in only</option>
+                  <option value="off" data-i18n="f.clickOff">Visual only</option>
+                </select>
               </label>
-              <label><span><span data-i18n="f.latency">Extra latency:</span> <output id="latencyOut">0 ms</output></span>
-                <input id="latency" type="range" min="-250" max="250" step="5" value="0">
+              <label><span data-i18n="f.autoStop">Auto stop</span>
+                <select id="autoStop">
+                  <option value="0">Off</option>
+                  <option value="1">after 1 silent bar</option>
+                  <option value="2" selected>after 2 silent bars</option>
+                  <option value="4">after 4 silent bars</option>
+                </select>
+              </label>
+              <label class="wide"><span data-i18n="f.tempoMode">Tempo mode</span>
+                <select id="tempoMode">
+                  <option value="track-abc" selected data-i18n="f.tempoTrackAbc">Follow my tempo — click stops after 2 transcribed bars</option>
+                  <option value="track-level" data-i18n="f.tempoTrackLevel">Follow my tempo — click stops after bar 2</option>
+                  <option value="fixed" data-i18n="f.tempoFixed">Continuous metronome, fixed tempo</option>
+                </select>
+              </label>
+            </div>
+            <h3 data-i18n="h.notation">ABC notation</h3>
+            <div class="grid">
+              <label><span data-i18n="f.unit">Note length (L:)</span>
+                <select id="unitL">
+                  <option value="1/8" selected>1/8</option>
+                  <option value="1/4">1/4</option>
+                  <option value="1/16">1/16</option>
+                </select>
               </label>
               <label><span data-i18n="f.grid">Rhythmic grid</span>
                 <select id="grid">
@@ -164,6 +155,25 @@
                 <select id="barsPerLine">
                   <option>2</option><option selected>4</option><option>8</option>
                 </select>
+              </label>
+              <p class="hint wide" data-i18n="f.unitHint">L:1/8 is the standard: 99.8 % of the settings on thesession.org use it.</p>
+            </div>
+            <h3 data-i18n="h.detection">Detection (NeuralNote / Basic Pitch)</h3>
+            <div class="grid">
+              <label><span data-i18n="f.instrument">Instrument</span>
+                <select id="instrument"></select>
+              </label>
+              <label><span><span data-i18n="f.noteSens">Note sensitivity:</span> <output id="noteSensOut">0.50</output></span>
+                <input id="noteSens" type="range" min="0.05" max="0.95" step="0.05" value="0.5">
+              </label>
+              <label><span><span data-i18n="f.splitSens">Split sensitivity:</span> <output id="splitSensOut">0.70</output></span>
+                <input id="splitSens" type="range" min="0.05" max="0.95" step="0.05" value="0.7">
+              </label>
+              <label><span><span data-i18n="f.minNote">Min. note length:</span> <output id="minNoteOut">60 ms</output></span>
+                <input id="minNote" type="range" min="20" max="200" step="5" value="60">
+              </label>
+              <label><span><span data-i18n="f.latency">Extra latency:</span> <output id="latencyOut">0 ms</output></span>
+                <input id="latency" type="range" min="-250" max="250" step="5" value="0">
               </label>
               <label class="check"><input id="autoAlign" type="checkbox" checked> <span data-i18n="f.autoAlign">Automatic alignment to the grid</span></label>
               <label class="check"><input id="melodia" type="checkbox" checked> <span data-i18n="f.melodia">Slurred notes without attack (“melodia trick”)</span></label>
@@ -184,6 +194,16 @@
             <button id="copyBtn" type="button" data-i18n="out.copy">Copy</button>
             <button id="downloadAbcBtn" type="button">.abc</button>
           </div>
+        </div>
+        <!-- Titre et type : renseignés après l'enregistrement (ils ne servent pas à la transcription). -->
+        <div id="tuneFields" class="tune-fields" hidden>
+          <label><span data-i18n="f.title">Title (T:)</span>
+            <input id="title" type="text" value="" placeholder="Untitled" data-i18n-attr="placeholder:untitled" autocomplete="off">
+          </label>
+          <label><span data-i18n="f.rhythm">Type (R:)</span>
+            <input id="rhythm" type="text" value="" list="rhythmList" placeholder="reel, jig, bourrée…" data-i18n-attr="placeholder:f.rhythmPh" autocomplete="off">
+            <datalist id="rhythmList"></datalist>
+          </label>
         </div>
         <p id="info" class="info"></p>
         <p id="keyInfo" class="info"></p>
@@ -216,6 +236,6 @@
     <div class="player-inner"><div id="synth" class="synth"></div></div>
   </div>
 
-  <script type="module" src="js/main.js?v=8"></script>
+  <script type="module" src="js/main.js?v=9"></script>
 </body>
 </html>

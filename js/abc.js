@@ -28,6 +28,34 @@ export function abcHeader(o) {
   ].filter(Boolean).join('\n');
 }
 
+const HEADER_ORDER = ['X', 'T', 'R', 'M', 'L', 'K'];
+
+/**
+ * Remplace (ou ajoute, ou retire si `value` est vide) un champ d'en-tête — T: ou R: — dans un ABC
+ * déjà affiché, sans toucher au reste : les retouches faites à la main dans le corps sont gardées.
+ * Seul le premier champ de ce nom avant K: est concerné (titres alternatifs T: conservés).
+ */
+export function setHeaderField(abc, field, value) {
+  const lines = abc.split('\n');
+  const kIdx = lines.findIndex(l => /^K:/.test(l));
+  const end = kIdx < 0 ? lines.length : kIdx;
+  const idx = lines.slice(0, end).findIndex(l => l.startsWith(`${field}:`));
+  const line = value ? `${field}: ${value}` : null;
+  if (idx >= 0) {
+    if (line) lines[idx] = line; else lines.splice(idx, 1);
+  } else if (line) {
+    // Insertion à la place habituelle : après le dernier champ qui le précède dans X T R M L K.
+    const rank = HEADER_ORDER.indexOf(field);
+    let at = 0;
+    for (let i = 0; i < end; i++) {
+      const r = HEADER_ORDER.indexOf((lines[i].match(/^([A-Za-z]):/) || [])[1]);
+      if (r >= 0 && r < rank) at = i + 1;
+    }
+    lines.splice(at, 0, line);
+  }
+  return lines.join('\n');
+}
+
 /**
  * Rend chaque mesure indépendamment (les accidents repartent à zéro à chaque barre : deux chaînes
  * égales = deux mesures musicalement identiques).

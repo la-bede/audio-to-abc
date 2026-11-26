@@ -58,16 +58,16 @@
       {
         const q = (id) => d.getElementById(id);
         const set = (id, v, ev = 'change') => { q(id).value = v; q(id).dispatchEvent(new Event(ev)); };
-        set('tuneType', 'jig'); set('keySelect', '9-dorian'); set('tempoMode', 'fixed'); set('countIn', '4');
+        set('meterPreset', '6/8'); set('keySelect', '9-dorian'); set('tempoMode', 'fixed'); set('countIn', '4');
         set('noteSens', '0.8', 'input'); set('latency', '60', 'input'); set('title', 'Essai', 'input');
-        const snap = () => ['tuneType', 'meter', 'keySelect', 'tempoMode', 'countIn', 'bpm', 'noteSens', 'latency', 'autoStop', 'title']
+        const snap = () => ['meterPreset', 'meter', 'beat', 'unitL', 'keySelect', 'tempoMode', 'countIn', 'bpm', 'noteSens', 'latency', 'autoStop', 'title']
           .map(id => `${id}=${q(id).value || '∅'}`).join(' ');
-        log('\nRéglages modifiés : ' + snap());
+        log('\nRéglages modifiés : ' + snap() + ' | titre « ' + q('metronomeTitle').textContent + ' »');
         w.confirm = () => true;   // confirmation acceptée automatiquement
         q('resetSettings').click();
         await wait(300);
         const head = q('abcText').value.trim().split('\n').filter(l => /^[TRMK]:/.test(l)).join(' | ');
-        log(`Après « Rétablir » : ${snap()} | langue=${d.documentElement.lang} | aperçu ${head}`);
+        log(`Après « Rétablir » : ${snap()} | langue=${d.documentElement.lang} | titre « ${q('metronomeTitle').textContent} » | aperçu ${head}`);
         frame.contentWindow.location.reload();
         await loaded();
         w = frame.contentWindow; d = w.document; watch(w);
@@ -82,10 +82,17 @@
       // Aperçu : l'en-tête ABC suit les réglages avant l'enregistrement.
       const header = () => $('abcText').value.trim().split('\n').filter(l => /^[RMK]:/.test(l)).join(' | ');
       log('Aperçu initial : ' + header());
-      $('tuneType').value = 'jig'; $('tuneType').dispatchEvent(new Event('change'));
+      $('meterPreset').value = '6/8'; $('meterPreset').dispatchEvent(new Event('change'));
       $('keySelect').value = '9-dorian'; $('keySelect').dispatchEvent(new Event('change'));
-      log('Aperçu après jig + Ador : ' + header());
-      $('tuneType').value = 'reel'; $('tuneType').dispatchEvent(new Event('change'));
+      log('Aperçu après 6/8 + Ador : ' + header() + ' | pulsation ' + $('beat').value + ' | tempo ' + $('bpm').value);
+      $('meterPreset').value = 'custom'; $('meterPreset').dispatchEvent(new Event('change'));
+      log('« Autre… » : champ M: visible ' + !$('meterCustomBox').hidden + ' (valeur ' + $('meter').value + ')');
+      $('meter').value = '5/8'; $('meter').dispatchEvent(new Event('change'));
+      log('M: 5/8 (Autre…) : ' + header());
+      log('Liste des métriques : ' + [...$('meterPreset').options].map(o => o.textContent).join(' | '));
+      $('meterPreset').value = '3/8'; $('meterPreset').dispatchEvent(new Event('change'));
+      log('M: 3/8 : ' + header() + ' | pulsation ' + $('beat').value + ' | tempo ' + $('bpm').value + ' | suggestions R: ' + [...d.querySelectorAll('#rhythmList option')].map(o => o.value).join(', '));
+      $('meterPreset').value = '4/4'; $('meterPreset').dispatchEvent(new Event('change'));
       $('keySelect').value = 'auto'; $('keySelect').dispatchEvent(new Event('change'));
       log('Lecteur visible avant transcription : ' + !$('playerBar').hidden);
 
@@ -104,7 +111,7 @@
           if (clickOff === null && d.body.dataset.click === 'off' && d.body.dataset.state === 'recording') {
             clickOff = `${((performance.now() - start) / 1000).toFixed(1)} s après le départ (${$('position').textContent})`;
           }
-          if (i === 40) log('pendant : ' + $('position').textContent + ' | bouton : ' + $('recordLabel').textContent);
+          if (i === 40) log('pendant : ' + $('position').textContent + ' | bouton : ' + $('recordLabel').textContent + ' | champs T:/R: ' + ($('tuneFields').hidden ? 'masqués' : 'visibles'));
           if (d.body.dataset.state === 'done') { auto = true; break; }
         }
         log('clic arrêté : ' + (clickOff || 'non (clic jusqu\'à la fin)'));
@@ -116,6 +123,18 @@
         log('bouton : ' + $('recordLabel').textContent + ' | Simplifier visible : ' + !$('simplifyBtn').hidden);
         log('ABC :\n' + $('abcText').value.trim());
         if (round === 1) {
+          // Titre et type renseignés après l'enregistrement : seul l'en-tête change.
+          const head = () => $('abcText').value.split('\n').filter(l => /^[TRM]:/.test(l)).join(' | ');
+          log(`champs T:/R: visibles : ${!$('tuneFields').hidden} | suggestions R: ${[...d.querySelectorAll('#rhythmList option')].map(o => o.value).join(', ')}`);
+          $('abcText').value += '% retouche manuelle\n'; $('abcText').dispatchEvent(new Event('input'));
+          $('title').value = 'Essai T'; $('title').dispatchEvent(new Event('input'));
+          $('rhythm').value = 'reel'; $('rhythm').dispatchEvent(new Event('input'));
+          await wait(300);
+          log(`après saisie T:/R: : ${head()} | retouche conservée : ${$('abcText').value.includes('% retouche manuelle')}`);
+          $('rhythm').value = ''; $('rhythm').dispatchEvent(new Event('input'));
+          await wait(200);
+          log(`R: effacé : ${head()}`);
+          $('rhythm').value = 'reel'; $('rhythm').dispatchEvent(new Event('input'));
           // Lecteur fixé en bas (au-dessus de la barre d'enregistrement en largeur smartphone), en haut et en bas de page.
           for (const where of ['haut', 'bas']) {
             w.scrollTo(0, where === 'haut' ? 0 : d.documentElement.scrollHeight);

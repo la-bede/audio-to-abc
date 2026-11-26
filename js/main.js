@@ -1,6 +1,6 @@
 // Orchestration : réglages → métronome + micro → Basic Pitch → quantification → ABC → partition.
 
-import { TUNE_TYPES, INSTRUMENTS, BEAT_CHOICES, parseFraction, defaultBeat, defaultGroup, beatSymbol, tuneTypeLabel } from './tunetypes.js';
+import { METERS, DEFAULT_METER, RHYTHM_SUGGESTIONS, INSTRUMENTS, BEAT_CHOICES, parseFraction, defaultBeat, defaultGroup, beatSymbol, meterLabel, meterShortLabel } from './tunetypes.js';
 import { t, getLang, setLang, applyStatic, syncUrl } from './i18n.js';
 import { PlayDetector } from './tempo.js';
 import { Metronome } from './metronome.js';
@@ -8,13 +8,14 @@ import { Recorder } from './recorder.js';
 import { Transcriber } from './transcriber.js';
 import { quantize, shouldAutoStop } from './quantize.js';
 import { allKeys, keyFromId, detectKey, makeKey } from './key.js';
-import { renderBars, layoutLinear, abcHeader, clipboardPayload } from './abc.js';
+import { renderBars, layoutLinear, abcHeader, clipboardPayload, setHeaderField } from './abc.js';
 import { PlaybackCursor, eventAt } from './cursor.js';
 import { simplify, layoutSimplified } from './structure.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
-  status: $('status'), title: $('title'), tuneType: $('tuneType'), meter: $('meter'), unitL: $('unitL'),
+  status: $('status'), title: $('title'), rhythm: $('rhythm'), rhythmList: $('rhythmList'), tuneFields: $('tuneFields'),
+  meterPreset: $('meterPreset'), meterValue: $('meterValue'), meterCustomBox: $('meterCustomBox'), meter: $('meter'), unitL: $('unitL'),
   keySelect: $('keySelect'), bpm: $('bpm'), bpmRange: $('bpmRange'), beat: $('beat'), tempoLabel: $('tempoLabel'),
   countIn: $('countIn'), pickup: $('pickup'), clickMode: $('clickMode'), instrument: $('instrument'),
   noteSens: $('noteSens'), splitSens: $('splitSens'), minNote: $('minNote'), latency: $('latency'),
@@ -25,7 +26,7 @@ const el = {
   recordingBox: $('recordingBox'), recAudio: $('recAudio'), downloadAudio: $('downloadAudio'),
   autoStop: $('autoStop'), simplifyBtn: $('simplifyBtn'), structureBox: $('structureBox'), structureInfo: $('structureInfo'),
   tolerance: $('tolerance'), settingsPanel: $('settingsPanel'), settingsSummary: $('settingsSummary'),
-  tempoMode: $('tempoMode'), playerBar: $('playerBar'), resetSettings: $('resetSettings'),
+  tempoMode: $('tempoMode'), playerBar: $('playerBar'), resetSettings: $('resetSettings'), metronomeTitle: $('metronomeTitle'),
 };
 
 const transcriber = new Transcriber();
@@ -49,7 +50,7 @@ const desktop = window.matchMedia('(min-width: 1024px)');
 
 // ---------------------------------------------------------------------------------------------
 // Remplissage des listes
-for (const id of Object.keys(TUNE_TYPES)) el.tuneType.add(new Option('', id));
+for (const id of [...Object.keys(METERS), 'custom']) el.meterPreset.add(new Option('', id));
 for (const id of Object.keys(INSTRUMENTS)) el.instrument.add(new Option('', id));
 for (const b of BEAT_CHOICES) el.beat.add(new Option('', String(b.value)));
 
@@ -67,7 +68,8 @@ for (const mode of MODES) {
 // Textes dépendant de la langue (les valeurs sélectionnées ne changent pas).
 function translateUi() {
   applyStatic();
-  for (const o of el.tuneType.options) o.textContent = tuneTypeLabel(o.value);
+  for (const o of el.meterPreset.options) o.textContent = meterLabel(o.value);
+  el.meterValue.textContent = meterShortLabel(el.meterPreset.value);
   for (const o of el.instrument.options) o.textContent = t(INSTRUMENTS[o.value].labelKey);
   BEAT_CHOICES.forEach((b, i) => { el.beat.options[i].textContent = t(b.labelKey); });
   for (const g of el.keySelect.querySelectorAll('optgroup')) g.label = t(`mode.${g.dataset.mode}`);
@@ -118,18 +120,36 @@ function selectBeat(value) {
   el.beat.value = best.value;
 }
 
-function applyTuneType() {
-  const t = TUNE_TYPES[el.tuneType.value];
-  const custom = el.tuneType.value === 'custom';
-  el.meter.readOnly = !custom;
-  el.unitL.disabled = !custom;
-  if (!custom) {
-    el.meter.value = t.M;
-    el.unitL.value = t.L;
-    selectBeat(t.beat);
-    setBpm(t.bpm);
+// Métrique proposée → M:, pulsation et tempo par défaut ; « Autre… » → saisie libre de M:.
+function applyMeterPreset() {
+  const m = METERS[el.meterPreset.value];
+  if (m) {
+    el.meter.value = el.meterPreset.value;
+    selectBeat(m.beat);
+    setBpm(m.bpm);
   }
+  applyMeterUi();
   refreshBeatUi();
+}
+
+// Choix de la liste déduit de M: (réglages mémorisés, retour aux valeurs par défaut).
+function syncMeterPreset() {
+  const m = el.meter.value.trim();
+  el.meterPreset.value = METERS[m] ? m : 'custom';
+  applyMeterUi();
+}
+
+function applyMeterUi() {
+  el.meterValue.textContent = meterShortLabel(el.meterPreset.value);
+  el.meterCustomBox.hidden = el.meterPreset.value !== 'custom';
+  refreshRhythmList();
+}
+
+// Suggestions de R: (saisi après l'enregistrement) selon la métrique.
+function refreshRhythmList() {
+  const m = parseFraction(el.meter.value);
+  const list = (m && RHYTHM_SUGGESTIONS[`${m.num}/${m.den}`]) || [];
+  el.rhythmList.replaceChildren(...list.map(r => new Option(r, r)));
 }
 
 function setBpm(v) {
@@ -153,18 +173,16 @@ function readSettings() {
   const meter = parseFraction(el.meter.value);
   const unit = parseFraction(el.unitL.value);
   if (!meter || !unit) return null;
-  const typeId = el.tuneType.value;
-  const type = TUNE_TYPES[typeId];
   let beat = Number(el.beat.value);
   let beatsPerBar = meter.value / beat;
   if (Math.abs(beatsPerBar - Math.round(beatsPerBar)) > 1e-6) { beat = defaultBeat(meter); beatsPerBar = meter.value / beat; }
   beatsPerBar = Math.round(beatsPerBar);
   const gridDiv = Number(el.grid.value);
   const unitsPerBar = meter.value / unit.value;
-  const groupUnits = typeId === 'custom' || el.unitL.value !== '1/8' ? defaultGroup(meter, unit.value) : type.group;
+  const groupUnits = defaultGroup(meter, unit.value);
   const ins = INSTRUMENTS[el.instrument.value];
   return {
-    typeId, rhythm: typeId === 'custom' ? null : typeId,
+    rhythm: el.rhythm.value.trim() || null,
     M: `${meter.num}/${meter.den}`, L: `${unit.num}/${unit.den}`, meter, unit: unit.value,
     beat, beatsPerBar, bpm: Number(el.bpm.value),
     countInBars: Number(el.countIn.value), pickup: el.pickup.value, clickMode: el.clickMode.value,
@@ -180,8 +198,10 @@ function readSettings() {
   };
 }
 
-// Persistance locale des réglages (confort uniquement).
-const PERSIST = ['title', 'tuneType', 'meter', 'unitL', 'keySelect', 'bpm', 'beat', 'countIn', 'pickup', 'clickMode', 'instrument',
+// Persistance locale des réglages (confort uniquement). Titre et type (R:) n'en font pas partie :
+// ils décrivent la transcription, pas les réglages (ils restent d'un enregistrement à l'autre
+// tant que la page est ouverte).
+const PERSIST = ['meter', 'unitL', 'keySelect', 'bpm', 'beat', 'countIn', 'pickup', 'clickMode', 'instrument',
   'noteSens', 'splitSens', 'minNote', 'latency', 'grid', 'barsPerLine', 'autoAlign', 'melodia', 'autoStop', 'tolerance', 'tempoMode'];
 function saveSettings() {
   updateSummary();
@@ -201,16 +221,16 @@ function loadSettings() {
       if (el.tempoMode.value === 'track-level') el.tempoMode.value = 'track-abc';
       localStorage.setItem('audio2abc.settingsVersion', '2');
     }
-    // Ancien titre par défaut : remplacé par le libellé traduit (champ vide).
-    if (['Sans titre', 'Untitled'].includes(el.title.value)) el.title.value = '';
+    // Anciennes clés « title » et « tuneType » (v8 et avant) : ignorées, M: et L: mémorisés suffisent.
     return true;
   } catch (_) { return false; }
 }
 
 // Retour aux réglages par défaut (la langue, choisie à part, est conservée).
 // Champs écrits dans le HTML : valeur d'origine (defaultValue / defaultChecked / defaultSelected) ;
-// listes remplies par le script : valeurs par défaut explicites, puis réglages du type « reel ».
-const SCRIPT_DEFAULTS = { tuneType: 'reel', instrument: 'generic', keySelect: 'auto' };
+// listes remplies par le script : valeurs par défaut explicites, puis pulsation et tempo de la
+// métrique par défaut (4/4). Titre et type (R:) ne sont pas des réglages : ils sont conservés.
+const SCRIPT_DEFAULTS = { instrument: 'generic', keySelect: 'auto' };
 function resetSettings() {
   if (state === 'recording' || state === 'stopping') return;
   if (!window.confirm(t('settings.resetConfirm'))) return;
@@ -225,8 +245,8 @@ function resetSettings() {
     }
     e.value = e.defaultValue;
   }
-  applyTuneType();                 // M:, L:, pulsation et tempo du type par défaut
-  applyTuneTypeLockState();
+  syncMeterPreset();
+  applyMeterPreset();              // pulsation et tempo de la métrique par défaut
   $('noteSensOut').textContent = Number(el.noteSens.value).toFixed(2);
   $('splitSensOut').textContent = Number(el.splitSens.value).toFixed(2);
   $('minNoteOut').textContent = `${el.minNote.value} ms`;
@@ -235,13 +255,14 @@ function resetSettings() {
 }
 el.resetSettings.addEventListener('click', resetSettings);
 
-// Résumé affiché quand le panneau de réglages est replié (smartphone).
+// Résumé affiché quand le panneau de réglages est replié (smartphone), et titre de la section
+// métronome : « Métronome de départ » quand le clic s'arrête pour suivre le tempo de l'interprète.
 function updateSummary() {
+  el.metronomeTitle.textContent = t(el.tempoMode.value === 'fixed' ? 'h.metronome' : 'h.metronomeStart');
   const s = readSettings();
   if (!s) return;
-  const type = tuneTypeLabel(s.typeId).replace('…', '');
   const key = s.keyId === 'auto' ? t('summary.autoKey') : keyFromId(s.keyId).session;
-  el.settingsSummary.textContent = `${type} · ${s.M} · ${beatSymbol(s.beat)} = ${s.bpm} · ${key}`;
+  el.settingsSummary.textContent = `${s.M} · ${beatSymbol(s.beat)} = ${s.bpm} · ${key}`;
 }
 
 // Sur bureau, le panneau de réglages reste toujours ouvert.
@@ -250,15 +271,26 @@ if (desktop.addEventListener) desktop.addEventListener('change', syncPanel);
 
 // ---------------------------------------------------------------------------------------------
 // Événements de l'interface
-el.tuneType.addEventListener('change', () => { applyTuneType(); onSettingsChanged('quant'); });
-el.meter.addEventListener('change', () => { refreshBeatUi(); onSettingsChanged('quant'); });
+el.meterPreset.addEventListener('change', () => { applyMeterPreset(); onSettingsChanged('quant'); });
+el.meter.addEventListener('change', () => { refreshRhythmList(); refreshBeatUi(); onSettingsChanged('quant'); });
 el.unitL.addEventListener('change', () => onSettingsChanged('quant'));
 el.beat.addEventListener('change', () => { refreshBeatUi(); saveSettings(); });
 el.bpm.addEventListener('change', () => { setBpm(el.bpm.value); saveSettings(); });
 el.bpmRange.addEventListener('input', () => { setBpm(el.bpmRange.value); saveSettings(); });
 for (const k of ['countIn', 'clickMode', 'autoStop']) el[k].addEventListener('change', saveSettings);
 for (const k of ['pickup', 'keySelect', 'grid', 'barsPerLine', 'autoAlign', 'tolerance', 'tempoMode']) el[k].addEventListener('change', () => onSettingsChanged('quant'));
-el.title.addEventListener('input', () => onSettingsChanged('quant'));
+el.title.addEventListener('input', onHeaderFieldInput);
+el.rhythm.addEventListener('input', onHeaderFieldInput);
+
+// T: et R: : seul l'en-tête de l'ABC affiché change (les retouches faites à la main sont gardées).
+function onHeaderFieldInput() {
+  if (!session) { renderPreview(); return; }
+  const s = readSettings();
+  if (!s) return;
+  const abc = setHeaderField(setHeaderField(el.abcText.value, 'T', s.title), 'R', s.rhythm);
+  el.abcText.value = abc;
+  scheduleRender(abc);
+}
 el.latency.addEventListener('input', () => { $('latencyOut').textContent = `${el.latency.value} ms`; onSettingsChanged('quant'); });
 el.noteSens.addEventListener('input', () => { $('noteSensOut').textContent = Number(el.noteSens.value).toFixed(2); onSettingsChanged('detect'); });
 el.splitSens.addEventListener('input', () => { $('splitSensOut').textContent = Number(el.splitSens.value).toFixed(2); onSettingsChanged('detect'); });
@@ -301,7 +333,7 @@ el.copyBtn.addEventListener('click', async () => {
   }
 });
 
-// Aperçu avant enregistrement : l'en-tête ABC suit les réglages (titre, type, M:, L:, tonalité).
+// Aperçu avant enregistrement : l'en-tête ABC suit les réglages (M:, L:, tonalité).
 function renderPreview() {
   if (session) return;
   const s = readSettings();
@@ -452,6 +484,7 @@ function resetOutput() {
   el.keyInfo.textContent = '';
   el.info.textContent = '';
   el.abcText.readOnly = true;
+  el.tuneFields.hidden = true;
 }
 
 async function stopRecording(reason = null) {
@@ -489,19 +522,14 @@ async function stopRecording(reason = null) {
   el.position.textContent = '—';
   el.simplifyBtn.hidden = false;
   el.abcText.readOnly = false;
+  el.tuneFields.hidden = false;   // titre et type se renseignent maintenant
   setSettingsLocked(false);
   regenerate();
 }
 
 // Tempo, pulsation et décompte sont figés pour l'enregistrement en cours (la grille en dépend).
 function setSettingsLocked(locked) {
-  for (const k of ['bpm', 'bpmRange', 'beat', 'countIn', 'clickMode', 'tuneType', 'meter', 'unitL', 'tempoMode', 'resetSettings']) el[k].disabled = locked;
-  if (!locked) applyTuneTypeLockState();
-}
-function applyTuneTypeLockState() {
-  const custom = el.tuneType.value === 'custom';
-  el.meter.readOnly = !custom;
-  el.unitL.disabled = !custom;
+  for (const k of ['bpm', 'bpmRange', 'beat', 'countIn', 'clickMode', 'meterPreset', 'meter', 'unitL', 'tempoMode', 'resetSettings']) el[k].disabled = locked;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -650,8 +678,8 @@ function animate() {
 // Initialisation
 setLang(getLang());
 translateUi();
-if (!loadSettings()) { el.tuneType.value = 'reel'; applyTuneType(); }
-applyTuneTypeLockState();
+if (loadSettings()) syncMeterPreset();
+else { el.meter.value = DEFAULT_METER; syncMeterPreset(); applyMeterPreset(); }
 setBpm(el.bpm.value);
 refreshBeatUi();
 $('noteSensOut').textContent = Number(el.noteSens.value).toFixed(2);

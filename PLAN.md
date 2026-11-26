@@ -287,3 +287,24 @@ Nouveau : `js/cursor.js`. Modifiés : `index.html`, `css/style.css`, `js/main.js
 
 - Lien en bas du panneau Réglages, avec confirmation : chaque réglage mémorisé revient à sa valeur d'origine (valeurs du HTML, type reel, instrument générique, tonalité auto, titre vide) ; la langue est conservée ; la transcription affichée ou l'aperçu ABC est recalculé. Désactivé pendant un enregistrement.
 - Version des fichiers `?v=8`.
+
+---
+
+# Plan v8 (itération 8) — Paramétrage simplifié : métrique seule avant l'enregistrement, T:/R: après, L: en réglage avancé
+
+Constats :
+- Le type d'air (R:) ne sert pas à la transcription : seule la métrique compte (barres, pulsation, groupement des notes). Il ne faisait qu'imposer M:, L:, la pulsation et un tempo par défaut.
+- Inventaire des L: sur thesession.org (dump `adactio/TheSession-data`, 55 838 versions de 23 199 airs, 22/11/2026) : l'en-tête généré par le site porte toujours `L: 1/8` ; seules 182 versions redéfinissent L: en tête de corps (71 × 1/16, 62 × 1/4, 46 × 1/8 redondants, 3 × 2/8), soit **99,8 % en L:1/8 effectif**, plus 49 changements de L: en cours de morceau.
+- Inventaire des L: chez Henrik Norbeck (`hn202601.zip`, 72 fichiers, 3 473 airs) : **1/8 pour 88,5 %**, 1/16 pour 11,3 %, 1/4 pour 4 airs ; aucun changement de L: en cours de morceau. Les airs à danser irlandais (reel, jig, polka, hornpipe, slide, slip jig, barndance, strathspey…) sont tous en 1/8. Le 1/16 sert aux polskas suédoises (3/4, 338 airs), aux mesures balkaniques en /16, aux an dro (2/4) et aux bourrées (3/8) ; le 1/4 à 3 airs de Carolan (3/4) et un air en 6/4. 1 474 airs n'ont aucune ligne L: (reels en C|, jigs) et reposent sur la valeur par défaut de la norme ABC (1/8 si M: ≥ 3/4, sinon 1/16).
+- Conclusion : le réglage L: n'a presque jamais besoin d'être touché.
+
+Changements :
+- Réglages « L'air » : **Métrique (M:)** en liste (2/4, 3/4, 4/4, 3/8, 6/8, 9/8, 12/8, 3/2), chacune suivie, dans la liste ouverte seulement, de ses un ou deux rythmes les plus courants avec « … » (4/4 — reel, hornpipe… ; 2/4 — polka… ; 3/4 — valse… ; 3/8 — bourrée… ; 6/8 — jig… ; 9/8 — slip jig… ; 12/8 — slide… ; 3/2 — three-two… ; traduits selon la langue). Liste fermée : la métrique seule (calque `#meterValue` posé sur le `<select>`, dont le texte est rendu transparent), sur la même ligne que la tonalité. + **Autre…** (saisie libre) ; tonalité. 3/8 ajouté pour les bourrées (notées en 3/8 chez Norbeck) : pulsation noire pointée, tempo 70. Choisir une métrique règle la pulsation et le tempo par défaut (comme le faisait le type). Le type, le titre et « Perso… » disparaissent des réglages.
+- Groupement des notes déduit de la métrique (`defaultGroup`) : demi-mesure en 4/4 et 2/2, noire pointée en x/8 composé (dont 3/8), sinon le temps — mêmes résultats que l'ancien tableau par type.
+- **Titre (T:) et type (R:)** : champs au-dessus de l'ABC, visibles après l'enregistrement. R: en saisie libre avec suggestions selon la métrique (types thesession + bourrée, scottish, valse). Modifier T:/R: ne change que l'en-tête de l'ABC affiché (`setHeaderField`) : les retouches manuelles sont conservées. R: vide → pas de ligne R:. T: et R: ne sont plus mémorisés ni remis à zéro par « Rétablir » (ce sont des données de la transcription) ; ils restent d'un enregistrement à l'autre tant que la page est ouverte.
+- Section « Métronome » réduite au **tempo** et à la **pulsation**, intitulée **« Métronome de départ »** avec les modes « Suivre mon tempo » (dont le mode par défaut) et « Métronome » en mode tempo fixe.
+- **Réglages avancés** réorganisés en trois groupes : « Métronome et enregistrement » (décompte, levée, clic, mode tempo, arrêt auto), « Notation ABC » (L:, grille rythmique, mesures par ligne, rappel « L:1/8 est la norme ») et « Détection (NeuralNote / Basic Pitch) » (instrument, sensibilités, durée min., latence, recalage, melodia).
+- Réglages mémorisés : anciennes clés `tuneType` et `title` ignorées ; M: et L: mémorisés reprennent la bonne entrée de la liste.
+- Version des fichiers `?v=9`.
+
+Tests : selftest (+ `setHeaderField`, groupement par métrique) ; recordtest (liste des métriques, « Autre… », suggestions R:, champs T:/R: masqués pendant l'enregistrement puis visibles, retouche manuelle conservée).

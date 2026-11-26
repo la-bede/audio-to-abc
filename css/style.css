@@ -147,6 +147,29 @@ details.advanced { margin-top: 14px; }
 details.advanced > summary { color: var(--accent); margin-bottom: 10px; min-height: 32px; }
 details.advanced > summary::before { content: '▸ '; }
 details.advanced[open] > summary::before { content: '▾ '; }
+details.advanced h3 { font-size: .8rem; font-weight: 600; color: var(--muted); margin: 14px 0 8px; letter-spacing: .03em; }
+details.advanced h3:first-of-type { margin-top: 4px; }
+.hint { margin: -4px 0 0; color: var(--muted); font-size: .8rem; }
+label[hidden], .tune-fields[hidden] { display: none; }
+
+/* Liste des métriques : les rythmes repères ne s'affichent que dans la liste ouverte ; fermée, un
+   calque montre la métrique seule (le texte propre au <select> est rendu transparent). */
+.select-wrap { position: relative; display: block; }
+.select-wrap select { -webkit-text-fill-color: transparent; }
+.select-wrap select option { -webkit-text-fill-color: var(--ink); color: var(--ink); background: var(--card); }
+.select-value {
+  position: absolute; left: 11px; right: 32px; top: 50%; transform: translateY(-50%);
+  pointer-events: none; color: var(--ink); font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.select-wrap:has(select:disabled) .select-value { opacity: .5; }
+
+/* Titre et type (R:), renseignés après l'enregistrement */
+.tune-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 12px;
+  margin-top: 12px;
+}
 
 button, .button {
   font: inherit;
@@ -272,5 +295,6 @@ audio { width: 100%; margin: 6px 0 10px; }
 }
 @media (max-width: 420px) {
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .tune-fields { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .position { font-size: .8rem; }
 }

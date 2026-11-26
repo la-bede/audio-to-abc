@@ -1,23 +1,34 @@
 import { t } from './i18n.js';
 
-// Types d'airs de thesession.org → métrique (M:), note de base (L:), pulsation et tempo par défaut.
+// Métriques proposées avant l'enregistrement → pulsation et tempo par défaut du métronome. Dans la
+// liste, chacune est suivie de ses rythmes les plus courants, pour se repérer (clés i18n « mhint.* »).
+// Le type d'air (R:) n'intervient pas dans la transcription : il se renseigne après
+// l'enregistrement, avec les suggestions de RHYTHM_SUGGESTIONS.
 // beat = durée d'une pulsation du métronome en fraction de ronde (1/2 = blanche, 1/4 = noire, 3/8 = noire pointée).
-// group = taille (en unités L) des groupes de notes séparés par une espace dans l'ABC.
+// L'ordre des clés est celui de la liste affichée.
+export const METERS = {
+  '2/4':  { beat: 1 / 4, bpm: 120 },
+  '3/4':  { beat: 1 / 4, bpm: 120 },
+  '4/4':  { beat: 1 / 2, bpm: 90 },
+  '3/8':  { beat: 3 / 8, bpm: 70 },
+  '6/8':  { beat: 3 / 8, bpm: 100 },
+  '9/8':  { beat: 3 / 8, bpm: 100 },
+  '12/8': { beat: 3 / 8, bpm: 120 },
+  '3/2':  { beat: 1 / 2, bpm: 80 },
+};
+export const DEFAULT_METER = '4/4';
 
-export const TUNE_TYPES = {
-  reel:        { label: 'Reel',        M: '4/4', L: '1/8', beat: 1 / 2, bpm: 90,  group: 4 },
-  jig:         { label: 'Jig',         M: '6/8', L: '1/8', beat: 3 / 8, bpm: 100, group: 3 },
-  'slip jig':  { label: 'Slip jig',    M: '9/8', L: '1/8', beat: 3 / 8, bpm: 100, group: 3 },
-  hornpipe:    { label: 'Hornpipe',    M: '4/4', L: '1/8', beat: 1 / 2, bpm: 70,  group: 4 },
-  polka:       { label: 'Polka',       M: '2/4', L: '1/8', beat: 1 / 4, bpm: 120, group: 2 },
-  slide:       { label: 'Slide',       M: '12/8', L: '1/8', beat: 3 / 8, bpm: 120, group: 3 },
-  waltz:       { label: 'Waltz',       M: '3/4', L: '1/8', beat: 1 / 4, bpm: 120, group: 2 },
-  barndance:   { label: 'Barndance',   M: '4/4', L: '1/8', beat: 1 / 2, bpm: 80,  group: 4 },
-  strathspey:  { label: 'Strathspey',  M: '4/4', L: '1/8', beat: 1 / 4, bpm: 110, group: 4 },
-  'three-two': { label: 'Three-two',   M: '3/2', L: '1/8', beat: 1 / 2, bpm: 80,  group: 4 },
-  mazurka:     { label: 'Mazurka',     M: '3/4', L: '1/8', beat: 1 / 4, bpm: 120, group: 2 },
-  march:       { label: 'March',       M: '2/4', L: '1/8', beat: 1 / 4, bpm: 100, group: 2 },
-  custom:      { labelKey: 'type.custom',      M: '4/4', L: '1/8', beat: 1 / 4, bpm: 100, group: 4 },
+// Suggestions pour R: selon la métrique : types thesession (march : 4/4 sur thesession, 2/4 ou
+// 6/8 ailleurs), puis quelques danses du trad français. La saisie reste libre.
+export const RHYTHM_SUGGESTIONS = {
+  '4/4':  ['reel', 'hornpipe', 'barndance', 'strathspey', 'march', 'scottish'],
+  '6/8':  ['jig', 'march'],
+  '2/4':  ['polka', 'march', 'bourrée', 'scottish'],
+  '3/4':  ['waltz', 'mazurka', 'valse'],
+  '9/8':  ['slip jig'],
+  '12/8': ['slide'],
+  '3/2':  ['three-two'],
+  '3/8':  ['bourrée', 'valse'],
 };
 
 export function parseFraction(str) {
@@ -34,17 +45,26 @@ export function defaultBeat(meter) {
   return 1 / meter.den;
 }
 
-// Groupement par défaut (unités L) pour une métrique perso.
+// Taille (en unités L) des groupes de notes séparés par une espace dans l'ABC, comme sur
+// thesession : demi-mesure en 4/4 et 2/2 (reel « eAAB eABB »), noire pointée en 3/8, 6/8, 9/8,
+// 12/8 (jig « GAB c^cd »), sinon le temps (polka, valse : noire ; three-two : blanche).
 export function defaultGroup(meter, unitL) {
-  const beat = defaultBeat(meter);
-  const g = Math.round(beat / unitL);
-  return Math.max(1, g);
+  let wholes;
+  if ((meter.num === 4 && meter.den === 4) || (meter.num === 2 && meter.den === 2)) wholes = 1 / 2;
+  else if (meter.den === 8 && meter.num % 3 === 0) wholes = 3 / 8;
+  else wholes = 1 / meter.den;
+  return Math.max(1, Math.round(wholes / unitL));
 }
 
-// Libellé d'un type d'air (les noms thesession restent en anglais).
-export function tuneTypeLabel(id) {
-  const tt = TUNE_TYPES[id];
-  return tt.labelKey ? t(tt.labelKey) : tt.label;
+// Libellé d'une entrée de la liste déroulante des métriques : « 4/4 — reel, hornpipe… » (les points de
+// suspension disent que la liste des rythmes n'est pas exhaustive), ou « Autre… ».
+export function meterLabel(id) {
+  return METERS[id] ? `${id} — ${t(`mhint.${id}`)}…` : t('f.meterOther');
+}
+
+// Libellé affiché une fois le choix fait (liste fermée) : la métrique seule.
+export function meterShortLabel(id) {
+  return METERS[id] ? id : t('f.meterOther');
 }
 
 export function beatSymbol(beat) {

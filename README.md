@@ -30,16 +30,25 @@ opens the page in that language; the address follows the switch, so it can be sh
 
 ### Usage
 
-1. Choose the **tune type**. It sets M:, L:, the beat and a default tempo. Types: reel, jig,
-   slip jig, hornpipe, polka, slide, waltz, barndance, strathspey, three-two, mazurka and march.
-   With **Custom…**, you enter M: and L: yourself.
-2. Set the **tempo**, the **count-in** (2 bars by default) and the **pickup**. In *Auto* mode, notes
-   played during the last count-in bar become the pickup. Choose the **tempo mode** (see below).
+1. Choose the **meter (M:)**: 2/4, 3/4, 4/4, 3/8, 6/8, 9/8, 12/8 or 3/2. The open list shows the
+   most common rhythms of each one to help you choose (4/4 — reel, hornpipe…; 2/4 — polka…;
+   3/4 — waltz…); once chosen, only the meter is displayed. It sets the
+   beat and a default tempo. With **Other…**, you type any meter.
+   The tune type (R:) is not needed for the transcription: like the title (T:), it is filled in
+   after recording. The note length **L:** (1/8 by default, the standard on thesession.org) is in
+   *Advanced settings*.
+2. Set the **tempo** and the **beat** (section *Start-only metronome*: by default the metronome only
+   gives the start, see *Tempo mode* below). The other metronome and recording settings are in
+   *Advanced settings → Metronome and recording*, with defaults that suit most cases: **count-in**
+   (2 bars), **pickup** (*Auto*: notes played during the last count-in bar become the pickup),
+   **click**, **tempo mode** (see below) and **auto stop**. The **instrument** (pitch range) is in
+   *Advanced settings → Detection*.
 3. **Key**: *Auto* detects it (major, minor, dorian, mixolydian). You can also set it
    (thesession format: Dmajor, Ador…).
 4. Click **Record**, then play after the count-in. Headphones are advised; otherwise choose the
-   “Count-in only” or “Visual only” click. The ABC updates about every 1.6 s, 2 to 3 s behind.
-5. Recording **stops by itself** after 2 bars without notes (configurable: 1, 2, 4 bars or off).
+   “Count-in only” or “Visual only” click (Advanced settings). The ABC updates about every 1.6 s, 2 to 3 s behind.
+5. Recording **stops by itself** after 2 bars without notes (configurable in Advanced settings:
+   1, 2, 4 bars or off).
    You can also click **Stop**. The ABC then becomes editable, and you can:
    - listen to the synthesised ABC: its player stays fixed at the bottom of the screen, however
      long the ABC is (under the score on a computer, above the record bar on a smartphone);
@@ -49,6 +58,9 @@ opens the page in that language; the address follows the switch, so it can be sh
      only);
    - copy the ABC (it pastes line by line into LibreOffice Writer or Word, and as plain text in a
      text editor) or download it as `.abc`;
+   - fill in the **title (T:)** and the **type (R:)** above the ABC (free text, with suggestions
+     matching the meter: reel, jig, polka… or bourrée, scottish, valse). Only the header changes:
+     edits made by hand in the ABC are kept;
    - change the key, pickup, grid or detection thresholds: the ABC is recomputed without
      recording again;
    - click **Simplify (repeats)** (see below);
@@ -62,7 +74,8 @@ the settings restores every default value (after confirmation); the language is 
 
 #### Tempo mode
 
-Keeping to a metronome through a whole tune is hard, and small drifts shift the bar lines. By
+(*Advanced settings → Metronome and recording*.) Keeping to a metronome through a whole tune is
+hard, and small drifts shift the bar lines. By
 default the metronome therefore only gives the start, and the transcription then **follows the
 player's tempo**:
 
@@ -146,7 +159,7 @@ index.html              interface
 css/style.css           responsive layout, light/dark theme
 js/main.js              orchestration
 js/i18n.js              English / French texts, remembered language
-js/tunetypes.js         tune types, beats, instruments
+js/tunetypes.js         meters, R: suggestions, beats, instruments
 js/metronome.js         Web Audio metronome (count-in, accent)
 js/recorder.js          microphone → AudioWorklet → 22,050 Hz, + MediaRecorder
 js/worklet-capture.js   AudioWorkletProcessor
@@ -197,19 +210,25 @@ telle quelle.
 
 ### Utilisation
 
-1. Choisir le **type d'air**. Cela règle M:, L:, la pulsation et un tempo par défaut. Les types sont
-   reel, jig, slip jig, hornpipe, polka, slide, waltz, barndance, strathspey, three-two, mazurka et
-   march. Avec **Perso…**, on saisit M: et L: soi-même.
-2. Régler le **tempo**, le **décompte** (2 mesures par défaut) et la **levée**. En mode *Auto*, les
-   notes jouées dans la dernière mesure du décompte deviennent la levée. Choisir le **mode tempo**
-   (voir ci-dessous).
+1. Choisir la **métrique (M:)** : 2/4, 3/4, 4/4, 3/8, 6/8, 9/8, 12/8 ou 3/2. La liste ouverte indique
+   les rythmes les plus courants de chacune pour aider au choix (4/4 — reel, hornpipe… ; 2/4 —
+   polka… ; 3/4 — valse…) ; une fois le choix fait, seule la métrique reste affichée. Elle règle la pulsation et un tempo par défaut. Avec **Autre…**, on saisit n'importe
+   quelle métrique. Le type d'air (R:) ne sert pas à la
+   transcription : comme le titre (T:), il se renseigne après l'enregistrement. La note de base
+   **L:** (1/8 par défaut, la norme sur thesession.org) est dans les *Réglages avancés*.
+2. Régler le **tempo** et la **pulsation** (section *Métronome de départ* : par défaut, le métronome
+   ne donne que le départ, voir *Mode tempo* ci-dessous). Les autres réglages du métronome et de l'enregistrement
+   sont dans *Réglages avancés → Métronome et enregistrement*, avec des valeurs par défaut qui
+   conviennent le plus souvent : **décompte** (2 mesures), **levée** (*Auto* : les notes jouées dans
+   la dernière mesure du décompte deviennent la levée), **clic**, **mode tempo** (voir ci-dessous) et
+   **arrêt auto**. L'**instrument** (tessiture) est dans *Réglages avancés → Détection*.
 3. **Tonalité** : *Auto* la détecte (majeur, mineur, dorien, mixolydien). On peut aussi en imposer
    une (format thesession : Dmajor, Ador…).
 4. **Enregistrer**, puis jouer après le décompte. Un casque est conseillé, sinon choisir le clic
-   « Décompte seulement » ou « Visuel seulement ». L'ABC se met à jour environ toutes les 1,6 s, avec
+   « Décompte seulement » ou « Visuel seulement » (réglages avancés). L'ABC se met à jour environ toutes les 1,6 s, avec
    2 à 3 s de retard.
-5. L'enregistrement **s'arrête tout seul** après 2 mesures sans note (réglable : 1, 2, 4 mesures
-   ou désactivé). On peut aussi cliquer sur **Arrêter**. L'ABC devient alors modifiable, et on peut :
+5. L'enregistrement **s'arrête tout seul** après 2 mesures sans note (réglable dans les réglages
+   avancés : 1, 2, 4 mesures ou désactivé). On peut aussi cliquer sur **Arrêter**. L'ABC devient alors modifiable, et on peut :
    - écouter l'ABC synthétisé : son lecteur reste fixé en bas de l'écran, quelle que soit la
      longueur de l'ABC (sous la partition sur ordinateur, au-dessus de la barre d'enregistrement
      sur smartphone) ;
@@ -219,6 +238,9 @@ telle quelle.
      en version linéaire seulement) ;
    - copier l'ABC (il se colle ligne par ligne dans LibreOffice Writer ou Word, et en texte brut
      dans un éditeur de texte) ou le télécharger en `.abc` ;
+   - renseigner le **titre (T:)** et le **type (R:)** au-dessus de l'ABC (saisie libre, avec des
+     suggestions selon la métrique : reel, jig, polka… ou bourrée, scottish, valse). Seul l'en-tête
+     change : les retouches faites à la main dans l'ABC sont conservées ;
    - changer la tonalité, la levée, la grille ou les seuils de détection, et l'ABC est recalculé
      sans réenregistrer ;
    - cliquer sur **Simplifier (reprises)** (voir ci-dessous) ;
@@ -233,8 +255,8 @@ bas des réglages, remet toutes les valeurs par défaut (après confirmation) ; 
 
 #### Mode tempo
 
-Suivre un métronome sur tout un air est difficile, et les petites dérives décalent les barres de
-mesure. Par défaut, le métronome ne donne donc que le départ, puis la transcription **suit le tempo
+(*Réglages avancés → Métronome et enregistrement*.) Suivre un métronome sur tout un air est
+difficile, et les petites dérives décalent les barres de mesure. Par défaut, le métronome ne donne donc que le départ, puis la transcription **suit le tempo
 de l'interprète** :
 
 - **Suivre mon tempo — clic arrêté après 2 mesures transcrites** (défaut) : le clic continue
@@ -319,7 +341,7 @@ index.html              interface
 css/style.css           mise en page responsive, thème clair/sombre
 js/main.js              orchestration
 js/i18n.js              textes anglais / français, langue mémorisée
-js/tunetypes.js         types d'airs, pulsations, instruments
+js/tunetypes.js         métriques, suggestions R:, pulsations, instruments
 js/metronome.js         métronome Web Audio (décompte, accent)
 js/recorder.js          micro → AudioWorklet → 22 050 Hz, + MediaRecorder
 js/worklet-capture.js   AudioWorkletProcessor
