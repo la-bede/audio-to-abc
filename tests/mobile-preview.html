@@ -11,15 +11,32 @@
   </style>
 </head>
 <body>
-  <!-- Aperçu de la page à la largeur d'un smartphone (390 × 844) : réglages ouverts / repliés. -->
+  <!-- Aperçu de la page à la largeur d'un smartphone (390 × 844) : réglages ouverts / transcription
+       longue, défilée vers le bas, avec le lecteur collé en haut et un curseur de lecture. -->
   <figure><iframe src="../index.html"></iframe><figcaption>Réglages ouverts</figcaption></figure>
-  <figure><iframe id="closed" src="../index.html"></iframe><figcaption>Réglages repliés</figcaption></figure>
+  <figure><iframe id="closed" src="../index.html"></iframe><figcaption>Transcription longue, page défilée (lecteur en haut)</figcaption></figure>
   <script>
+    const LONG = 'X: 1\nT: Exemple\nR: reel\nM: 4/4\nL: 1/8\nK: Dmaj\n'
+      + '|:d2fd A2FA|dfed cABc|d2fd A2FA|1 BGFE D2FA:|2 BGFE D2A2||\n|:e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4:|\n'.repeat(4);
     document.getElementById('closed').addEventListener('load', (e) => {
-      const d = e.target.contentDocument;
-      d.getElementById('settingsPanel').open = false;
-      d.getElementById('abcText').value = 'X: 1\nT: Exemple\nR: reel\nM: 4/4\nL: 1/8\nK: Dmaj\n|:d2fd A2FA|dfed cABc|d2fd A2FA|1 BGFE D2FA:|2 BGFE D2A2||\n|:e2fe d2cB|ABcd e4|e2fe d2cB|BGFE D4:|';
-      d.getElementById('simplifyBtn').hidden = false;
+      const w = e.target.contentWindow, d = e.target.contentDocument;
+      setTimeout(() => {
+        d.getElementById('settingsPanel').open = false;
+        d.getElementById('abcText').value = LONG;
+        d.getElementById('simplifyBtn').hidden = false;
+        const visual = w.ABCJS.renderAbc(d.getElementById('paper'), LONG, { responsive: 'resize', add_classes: true })[0];
+        const sc = new w.ABCJS.synth.SynthController();
+        sc.load(d.getElementById('synth'), null, { displayRestart: true, displayPlay: true, displayProgress: true, displayWarp: true, displayLoop: true });
+        d.getElementById('playerBar').hidden = false;
+        // Curseur factice sur une note pour l'aperçu.
+        const ev = visual.setTiming(60, 0).filter(x => x.type === 'event' && x.left != null)[40];
+        const line = d.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('class', 'abcjs-cursor');
+        line.setAttribute('x1', ev.left - 2); line.setAttribute('x2', ev.left - 2);
+        line.setAttribute('y1', ev.top); line.setAttribute('y2', ev.top + ev.height);
+        d.querySelector('#paper svg').appendChild(line);
+        w.scrollTo(0, d.documentElement.scrollHeight);
+      }, 500);
     });
   </script>
 </body>

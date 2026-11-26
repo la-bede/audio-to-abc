@@ -50,7 +50,9 @@ body {
 h1 { font-size: 1.4rem; margin: 0; }
 h2 { font-size: .85rem; margin: 0 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .status { margin: 0 0 12px; color: var(--muted); font-size: .9rem; min-width: 0; overflow-wrap: anywhere; }
-html, body { overflow-x: hidden; }
+/* « clip » (et non « hidden ») : coupe le débordement horizontal sans créer de conteneur de
+   défilement, ce qui casserait position: sticky (lecteur en haut, colonne gauche du bureau). */
+html, body { overflow-x: clip; }
 .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -85,6 +87,28 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 32px; 
 #bpmRange { margin-top: 10px; }
 output { color: var(--ink); font-variant-numeric: tabular-nums; }
 .beat-sym { color: var(--ink); }
+
+/* Lecteur de l'ABC collé en haut de l'écran */
+.player-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
+}
+.player-bar[hidden] { display: none; }
+.player-inner { max-width: 1280px; margin: 0 auto; padding: 6px 16px; }
+.player-bar .synth { margin: 0; }
+.player-bar .abcjs-inline-audio { height: 40px; border-radius: 8px; padding: 0 8px; }
+.player-bar .abcjs-inline-audio .abcjs-btn { width: 34px; height: 34px; }
+.player-bar .abcjs-midi-progress-background { flex: 1; min-width: 60px; }
+@media (max-width: 480px) {
+  /* Écran étroit : on masque le réglage de vitesse pour garder une barre de progression utilisable. */
+  .player-bar .abcjs-tempo-wrapper { display: none; }
+}
+/* Barre verticale de lecture sur la partition (fond toujours blanc) */
+.paper .abcjs-cursor { stroke: #c23b2e; stroke-width: 2; }
 
 /* Choix de la langue */
 .lang-switch { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; align-self: center; }
@@ -193,8 +217,8 @@ audio { width: 100%; margin: 6px 0 10px; }
   }
   .col-left {
     position: sticky;
-    top: 12px;
-    max-height: calc(100vh - 24px);
+    top: calc(var(--player-h, 0px) + 12px);
+    max-height: calc(100vh - 24px - var(--player-h, 0px));
     overflow-y: auto;
     scrollbar-width: thin;
   }

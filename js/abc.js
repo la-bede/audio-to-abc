@@ -139,3 +139,16 @@ function lenStr(x) {
   if (Number.isInteger(x * 2)) return `${x * 2}/2`;
   return String(x);
 }
+
+/**
+ * Contenu du presse-papiers : texte avec fins de ligne Windows (\r\n) et HTML avec un paragraphe
+ * par ligne. LibreOffice Writer ou Word utilisent la version HTML : chaque ligne ABC reste séparée.
+ */
+export function clipboardPayload(abc) {
+  const lines = abc.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n');
+  const esc = (x) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return {
+    plain: lines.join('\r\n') + '\r\n',
+    html: lines.map(l => `<p style="margin:0;font-family:monospace">${l ? esc(l) : '&nbsp;'}</p>`).join(''),
+  };
+}

@@ -225,3 +225,49 @@ Nouveau : `js/tempo.js`. Modifiés : `js/quantize.js`, `js/metronome.js`, `js/re
 2. **recordtest** (faux micro Chrome) : mode par défaut → `data-click` passe à `off` après ~2 mesures de jeu ; option 2 → arrêt plus tardif ; mode continu → clic jusqu'à la fin ; `?lang=fr` force le français et l'URL suit la bascule de langue ; aucune erreur JS.
 3. Commit + push sur `main`, contrôle de la version en ligne (`?lang=fr`).
 4. Test réel par l'utilisateur : même air joué avec les 3 modes, comparaison des ABC.
+
+---
+
+# Plan v5 (itération 5) — Lecteur toujours visible, curseur de lecture, mode tempo par défaut, ABC en direct, copie vers Writer
+
+## Contexte
+Retours après test réel :
+1. Le lecteur de l'ABC synthétisé disparaît quand l'ABC est long → il doit rester **visible en haut de l'écran** (PC et smartphone). Choix utilisateur : **lecteur de l'ABC seulement** (le lecteur de l'enregistrement reste à sa place).
+2. Pendant une lecture, une **barre verticale** doit montrer la position sur la partition — choix utilisateur : **pour les deux lectures** (ABC synthétisé et enregistrement).
+3. Mode tempo par défaut : **« clic arrêté après 2 mesures transcrites »**.
+4. Avant l'enregistrement, changer un réglage (type, tonalité, titre…) ne met pas à jour la section ABC.
+5. Un ABC copié depuis le site et collé dans LibreOffice Writer arrive **sur une seule ligne**.
+
+## 1. Lecteur ABC collé en haut — `index.html`, `css/style.css`, `js/main.js`
+- Nouveau conteneur `#playerBar` (enfant direct de `<body>`, avant l'en-tête), `position: sticky; top: 0; z-index` au-dessus du contenu, fond opaque + ombre légère ; il accueille `#synth` (contrôles abcjs : lecture, retour, boucle, progression, vitesse).
+- Masqué tant qu'aucune transcription terminée n'existe ; affiché quand le lecteur abcjs est créé, masqué par `resetOutput()`.
+- Sa hauteur est publiée dans la variable CSS `--player-h` (ResizeObserver) : la colonne gauche collante du bureau (`top`) et les ancres en tiennent compte. Sur smartphone : lecteur en haut, barre d'enregistrement toujours fixée en bas.
+
+## 2. Curseur de lecture (barre verticale sur la partition) — `js/cursor.js` (nouveau), `js/main.js`
+- Fonction commune `drawCursor(ev)` / `hideCursor()` : une ligne SVG `.abcjs-cursor` ajoutée à la partition (`x = ev.left − 2`, `y = ev.top` → `ev.top + ev.height`), couleur d'accent, visible en clair et sombre. Défilement automatique doux pour garder la ligne courante visible (en tenant compte du lecteur collé en haut).
+- **Lecture de l'ABC** : objet `CursorControl` d'abcjs passé à `synthControl.load()` (`onStart`, `onEvent`, `onFinished` → `drawCursor` / `hideCursor`).
+- **Lecture de l'enregistrement** : pendant que l'`<audio>` joue, boucle `requestAnimationFrame` : temps du média → temps du contexte (`recorder.firstTime + t`) → latence → position en unités L (via `lastQ.tempo.toUnits` en mode suivi, ou grille fixe + recalage), → position depuis le début de l'air (levée comprise) → millisecondes de la partition au tempo de lecture → dernier événement des `noteTimings` d'abcjs (`ABCJS.TimingCallbacks`) → `drawCursor`. `quantize` expose pour cela l'origine et le décalage déjà calculés.
+- Version simplifiée (reprises) : le curseur de l'enregistrement est désactivé (l'ordre joué ne correspond plus à l'écrit) ; celui de la lecture ABC fonctionne (abcjs gère les reprises).
+
+## 3. Mode tempo par défaut — `index.html`, `js/main.js`
+- `track-abc` devient l'option sélectionnée par défaut (premier de la liste, libellé inchangé).
+- Migration unique : un ancien réglage mémorisé `track-level` (enregistré automatiquement comme défaut précédent) passe à `track-abc` une seule fois (marqueur `audio2abc.settingsVersion = 2`) ; un choix fait ensuite par l'utilisateur est respecté.
+
+## 4. ABC mis à jour en direct avant l'enregistrement — `js/main.js`
+- `renderPreview()` : quand aucune transcription n'existe, la zone ABC affiche l'en-tête construit avec `abcHeader()` (`js/abc.js`) à partir des réglages courants (titre ou « Untitled », R: du type, M:, L:, K: imposée ou Dmaj par défaut) et la partition vide est redessinée.
+- Appelée à l'initialisation, à chaque changement de réglage sans transcription (`onSettingsChanged`, titre, type, métrique, L:, tonalité) et au changement de langue (titre par défaut traduit).
+
+## 5. Copie compatible Writer — `js/main.js` (fonction pure dans `js/abc.js` pour test)
+- `clipboardPayload(abc)` → `{ plain, html }` : texte avec fins de ligne `\r\n`, et HTML avec un paragraphe par ligne (`<p style="margin:0;font-family:monospace">`, caractères échappés).
+- Bouton Copier : `navigator.clipboard.write([new ClipboardItem({ 'text/html', 'text/plain' })])` ; repli `writeText(plain)` puis `execCommand('copy')`. Writer utilise la version HTML → une ligne ABC par paragraphe ; les éditeurs de texte reçoivent la version texte.
+- Le fichier `.abc` téléchargé reste en `\n` (format standard).
+
+## Fichiers
+Nouveau : `js/cursor.js`. Modifiés : `index.html`, `css/style.css`, `js/main.js`, `js/abc.js`, `js/quantize.js` (exposition origine/décalage), `tests/selftest.html`, `tests/recordtest.html`, `README.md` (EN + FR), `PLAN.md` (ajout v5).
+
+## Vérification
+1. **Autotests** : 42 existants + `clipboardPayload` (CRLF, un `<p>` par ligne, échappement `<`, `&`) + correspondance temps d'enregistrement → position dans l'air (tempo fixe et suivi).
+2. **recordtest** (Chrome headless, faux joueur WAV) : mode par défaut = `track-abc` ; changement de type/tonalité avant enregistrement → en-tête ABC mis à jour ; après transcription : `#playerBar` visible et collé en haut après défilement en bas de page ; lecture de l'enregistrement → ligne `.abcjs-cursor` présente et qui avance ; lecture ABC → ligne présente ; aucune erreur JS.
+3. Captures bureau (1440 px) et smartphone (390 px, `tests/mobile-preview.html`) avec un ABC long : lecteur en haut, barre d'enregistrement en bas, pas de chevauchement.
+4. Commit + push sur `main`, contrôle de la version en ligne.
+5. Test utilisateur : collage dans LibreOffice Writer (lignes séparées), lecture avec curseur sur PC et smartphone.

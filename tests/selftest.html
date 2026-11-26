@@ -20,7 +20,7 @@
     import { Transcriber } from '../js/transcriber.js';
     import { quantize, shouldAutoStop } from '../js/quantize.js';
     import { detectKey } from '../js/key.js';
-    import { renderBars, layoutLinear } from '../js/abc.js';
+    import { renderBars, layoutLinear, clipboardPayload } from '../js/abc.js';
     import { simplify, layoutSimplified } from '../js/structure.js';
     import { getLang, setLang } from '../js/i18n.js';
     import { trackTempo, PlayDetector } from '../js/tempo.js';
@@ -88,6 +88,14 @@
     check('aucune note → continue', shouldAutoStop({ ...base, notes: [], analyzedSec: 30 }).stop, false);
     check('bruit avant le décompte ignoré', shouldAutoStop({ ...base, notes: [n(-1, 0.2)], analyzedSec: 30 }).stop, false);
     check('arrêt auto désactivé', shouldAutoStop({ ...base, bars: 0, notes: [n(3, 2)], analyzedSec: 30 }).stop, false);
+
+    log('\n=== Copie (presse-papiers compatible Writer) ===');
+    {
+      const cp = clipboardPayload('X: 1\nT: A<B & C\nK: Dmaj\n|:d2fd A2FA:|\n');
+      check('texte : fins de ligne \\r\\n', cp.plain, 'X: 1\r\nT: A<B & C\r\nK: Dmaj\r\n|:d2fd A2FA:|\r\n');
+      check('HTML : un paragraphe par ligne', (cp.html.match(/<p /g) || []).length, 4);
+      check('HTML : caractères échappés', cp.html.includes('T: A&lt;B &amp; C'), true);
+    }
 
     log('\n=== Suivi du tempo (trackTempo) et détection du début de jeu ===');
     {
@@ -233,6 +241,13 @@
             log(`  (tempo fixe : ${bodyAbc === c.expected ? 'identique' : 'barres décalées, comme attendu'})`);
           }
           if (track) r = rr;
+          // Curseur de l'enregistrement : le début de la dernière note doit tomber sur sa position.
+          if (track || !c.trackOnly) {
+            // (les fragments de fin de note tenue, fusionnés par la quantification, sont exclus)
+            const lastNote = notes.filter(x => x.dur >= 0.6 * c.eighth).reduce((a, b) => (b.start > a.start ? b : a));
+            const lastEv = [...q.events].reverse().find(e => e.midi != null);
+            check(`${c.name} — ${mode} — temps → position (curseur)`, Math.round(q.toSteps(lastNote.start - t0) - q.origin), lastEv.pos);
+          }
         }
         if (c.simplified) {
           const res = simplify(r.bars, { tolerance: 0 });

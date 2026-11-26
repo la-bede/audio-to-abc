@@ -8,7 +8,8 @@ import { Recorder } from './recorder.js';
 import { Transcriber } from './transcriber.js';
 import { quantize, shouldAutoStop } from './quantize.js';
 import { allKeys, keyFromId, detectKey, makeKey } from './key.js';
-import { renderBars, layoutLinear } from './abc.js';
+import { renderBars, layoutLinear, abcHeader, clipboardPayload } from './abc.js';
+import { PlaybackCursor, eventAt } from './cursor.js';
 import { simplify, layoutSimplified } from './structure.js';
 
 const $ = (id) => document.getElementById(id);
@@ -24,7 +25,7 @@ const el = {
   recordingBox: $('recordingBox'), recAudio: $('recAudio'), downloadAudio: $('downloadAudio'),
   autoStop: $('autoStop'), simplifyBtn: $('simplifyBtn'), structureBox: $('structureBox'), structureInfo: $('structureInfo'),
   tolerance: $('tolerance'), settingsPanel: $('settingsPanel'), settingsSummary: $('settingsSummary'),
-  tempoMode: $('tempoMode'),
+  tempoMode: $('tempoMode'), playerBar: $('playerBar'),
 };
 
 const transcriber = new Transcriber();
@@ -39,7 +40,11 @@ let audioUrl = null;      // URL objet de l'enregistrement courant
 let stopReason = null;     // { key, vars } : raison de l'arrêt automatique
 let statusMsg = { key: 'status.loading' };
 let infoMsg = null;
-let lastQ = null;         // dernière quantification (événements, tempo suivi)       // message hors transcription (erreur micro, métrique invalide)
+let lastQ = null;         // dernière quantification (événements, tempo suivi)
+const cursor = new PlaybackCursor($('paper'));
+let recTimings = null;    // positions des notes sur la partition (abcjs setTiming, 60 pulsations/min)
+let recBeatLen = 0.25;    // durée d'une pulsation abcjs (fraction de ronde)
+let recCursorRaf = null;       // message hors transcription (erreur micro, métrique invalide)
 const desktop = window.matchMedia('(min-width: 1024px)');
 
 // ---------------------------------------------------------------------------------------------
@@ -84,7 +89,7 @@ function translateUi() {
   renderStatus();
   updateSummary();
   if (session) regenerate();
-  else el.info.textContent = infoMsg ? t(infoMsg.key, infoMsg.vars) : '';
+  else { el.info.textContent = infoMsg ? t(infoMsg.key, infoMsg.vars) : ''; renderPreview(); }
 }
 
 function setStatus(key, vars) { statusMsg = { key, vars }; renderStatus(); }
@@ -191,6 +196,11 @@ function loadSettings() {
     const o = JSON.parse(localStorage.getItem('audio2abc.settings') || 'null');
     if (!o) return false;
     for (const k of PERSIST) if (k in o) { if (el[k].type === 'checkbox') el[k].checked = o[k]; else el[k].value = o[k]; }
+    // v2 : le mode tempo par défaut devient « clic arrêté après 2 mesures transcrites ».
+    if (localStorage.getItem('audio2abc.settingsVersion') !== '2') {
+      if (el.tempoMode.value === 'track-level') el.tempoMode.value = 'track-abc';
+      localStorage.setItem('audio2abc.settingsVersion', '2');
+    }
     // Ancien titre par défaut : remplacé par le libellé traduit (champ vide).
     if (['Sans titre', 'Untitled'].includes(el.title.value)) el.title.value = '';
     return true;
@@ -230,7 +240,8 @@ for (const k of ['instrument', 'melodia']) el[k].addEventListener('change', () =
 let detectTimer = null;
 function onSettingsChanged(kind) {
   saveSettings();
-  if (!session || state === 'recording' || state === 'stopping') return;
+  if (!session) { renderPreview(); return; }
+  if (state === 'recording' || state === 'stopping') return;
   if (kind === 'detect') {
     clearTimeout(detectTimer);
     detectTimer = setTimeout(() => {
@@ -243,10 +254,35 @@ function onSettingsChanged(kind) {
 }
 
 el.abcText.addEventListener('input', () => scheduleRender(el.abcText.value));
+// Copie : HTML (une ligne ABC par paragraphe, pour Writer / Word) + texte brut en \r\n.
 el.copyBtn.addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(el.abcText.value); flash(el.copyBtn, t('out.copied')); }
-  catch (_) { el.abcText.select(); document.execCommand('copy'); flash(el.copyBtn, t('out.copied')); }
+  const { plain, html } = clipboardPayload(el.abcText.value);
+  try {
+    if (window.ClipboardItem && navigator.clipboard?.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/plain': new Blob([plain], { type: 'text/plain' }),
+        'text/html': new Blob([html], { type: 'text/html' }),
+      })]);
+    } else {
+      await navigator.clipboard.writeText(plain);
+    }
+    flash(el.copyBtn, t('out.copied'));
+  } catch (_) {
+    try { await navigator.clipboard.writeText(plain); flash(el.copyBtn, t('out.copied')); }
+    catch (__) { el.abcText.select(); document.execCommand('copy'); flash(el.copyBtn, t('out.copied')); }
+  }
 });
+
+// Aperçu avant enregistrement : l'en-tête ABC suit les réglages (titre, type, M:, L:, tonalité).
+function renderPreview() {
+  if (session) return;
+  const s = readSettings();
+  if (!s) return;
+  const key = s.keyId !== 'auto' ? keyFromId(s.keyId) : makeKey(2, 'major');
+  const abc = abcHeader({ header: { title: s.title, rhythm: s.rhythm, M: s.M, L: s.L }, key }) + '\n';
+  el.abcText.value = abc;
+  scheduleRender(abc);
+}
 el.downloadAbcBtn.addEventListener('click', () => {
   const name = (readSettings()?.title || 'transcription').replace(/[^\w\- ]+/g, '').trim() || 'transcription';
   downloadBlob(new Blob([el.abcText.value], { type: 'text/vnd.abc;charset=utf-8' }), `${name}.abc`);
@@ -376,6 +412,9 @@ function resetOutput() {
   el.simplifyBtn.hidden = true;
   el.structureBox.hidden = true;
   destroySynth();
+  stopRecordingCursor();
+  cursor.hide();
+  recTimings = null;
   el.paper.innerHTML = '';
   el.recordingBox.hidden = true;
   el.recAudio.pause();
@@ -514,14 +553,29 @@ function render(abc) {
   if (abc === lastRendered && synthControl) return;
   lastRendered = abc;
   const visual = window.ABCJS.renderAbc('paper', abc, { responsive: 'resize', add_classes: true, paddingleft: 8, paddingright: 8 })[0];
-  if (state !== 'recording' && session?.final && visual) setupSynth(visual);
+  cursor.hide();
+  if (state !== 'recording' && session?.final && visual) {
+    // Positions des notes à 60 pulsations/min (copie : le lecteur abcjs recalcule les siennes).
+    try {
+      recBeatLen = visual.getBeatLength();
+      recTimings = visual.setTiming(60, 0).filter(e => e.type === 'event' && e.left != null).slice();
+    } catch (_) { recTimings = null; }
+    setupSynth(visual);
+  }
 }
 
 function setupSynth(visual) {
   if (!window.ABCJS.synth || !window.ABCJS.synth.supportsAudio()) return;
   if (!synthControl) {
     synthControl = new window.ABCJS.synth.SynthController();
-    synthControl.load('#synth', null, { displayRestart: true, displayPlay: true, displayProgress: true, displayWarp: true, displayLoop: true });
+    const cursorControl = {
+      beatSubdivisions: 2,
+      onStart() { el.recAudio.pause(); },
+      onEvent(ev) { if (ev && ev.left != null) cursor.draw(ev); },
+      onFinished() { cursor.hide(); },
+    };
+    synthControl.load('#synth', cursorControl, { displayRestart: true, displayPlay: true, displayProgress: true, displayWarp: true, displayLoop: true });
+    el.playerBar.hidden = false;
   }
   const s = readSettings();
   // Tempo de lecture : tempo moyen suivi, sinon celui du métronome.
@@ -533,6 +587,7 @@ function destroySynth() {
   if (synthControl) { try { synthControl.destroy(); } catch (_) { /* rien */ } }
   synthControl = null;
   el.synth.innerHTML = '';
+  el.playerBar.hidden = true;
   lastRendered = '';
 }
 
@@ -573,7 +628,42 @@ $('minNoteOut').textContent = `${el.minNote.value} ms`;
 $('latencyOut').textContent = `${el.latency.value} ms`;
 translateUi();
 syncPanel();
-el.abcText.value = `X: 1\nT: ${t('untitled')}\nR: reel\nM: 4/4\nL: 1/8\nK: Dmaj\n`;
+renderPreview();
+
+// Hauteur du lecteur collé en haut → variable CSS (colonne gauche collante, défilement du curseur).
+if (window.ResizeObserver) {
+  new ResizeObserver(() => {
+    const h = el.playerBar.hidden ? 0 : el.playerBar.offsetHeight;
+    document.documentElement.style.setProperty('--player-h', `${h}px`);
+  }).observe(el.playerBar);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Curseur pendant la lecture de l'enregistrement : temps du média → position dans l'air → partition.
+function recordingCursorFrame() {
+  recCursorRaf = requestAnimationFrame(recordingCursorFrame);
+  if (!recTimings || !recTimings.length || !lastQ?.toSteps || !session || simplified) { cursor.hide(); return; }
+  const s = readSettings();
+  const rel = (recorder.firstTime ?? session.t0) + el.recAudio.currentTime - session.latency - s.extraLatency - session.t0;
+  const steps = lastQ.toSteps(rel) - lastQ.origin + lastQ.pickupSteps;   // depuis le début de l'air (levée comprise)
+  if (steps < 0) { cursor.hide(); return; }
+  const wholes = (steps / s.gridDiv) * s.unit;
+  const ms = (wholes / recBeatLen) * 1000;                                 // setTiming(60) : 1 pulsation = 1 s
+  const last = recTimings[recTimings.length - 1];
+  if (ms > last.milliseconds + 2000) { cursor.hide(); return; }
+  cursor.draw(eventAt(recTimings, ms));
+}
+function stopRecordingCursor() {
+  if (recCursorRaf) cancelAnimationFrame(recCursorRaf);
+  recCursorRaf = null;
+}
+el.recAudio.addEventListener('play', () => {
+  if (synthControl) { try { synthControl.pause(); } catch (_) { /* rien */ } }
+  stopRecordingCursor();
+  recordingCursorFrame();
+});
+el.recAudio.addEventListener('pause', () => { stopRecordingCursor(); cursor.hide(); });
+el.recAudio.addEventListener('ended', () => { stopRecordingCursor(); cursor.hide(); });
 
 (async () => {
   try {

@@ -41,8 +41,13 @@ opens the page in that language; the address follows the switch, so it can be sh
    “Count-in only” or “Visual only” click. The ABC updates about every 1.6 s, 2 to 3 s behind.
 5. Recording **stops by itself** after 2 bars without notes (configurable: 1, 2, 4 bars or off).
    You can also click **Stop**. The ABC then becomes editable, and you can:
-   - play back the recording, or listen to the synthesised ABC;
-   - copy the ABC or download it as `.abc`;
+   - listen to the synthesised ABC: its player stays pinned to the top of the screen, however
+     long the ABC is;
+   - play back the recording (player under the score);
+   - follow either playback on the score: a vertical bar shows the current position (for the
+     recording, in the linear version only);
+   - copy the ABC (it pastes line by line into LibreOffice Writer or Word, and as plain text in a
+     text editor) or download it as `.abc`;
    - change the key, pickup, grid or detection thresholds: the ABC is recomputed without
      recording again;
    - click **Simplify (repeats)** (see below);
@@ -57,12 +62,12 @@ Keeping to a metronome through a whole tune is hard, and small drifts shift the 
 default the metronome therefore only gives the start, and the transcription then **follows the
 player's tempo**:
 
-- **Follow my tempo — click stops after bar 2** (default): the click stops exactly at the end of
-  the 2nd bar (pickup excluded). The start of playing is detected from the microphone level; if you
-  start late, bars are counted from where you start.
-- **Follow my tempo — click stops after 2 transcribed bars**: the click goes on until the ABC
-  contains 2 complete bars, then stops at the next bar line (about 1 to 2 extra bars of click,
-  because of the analysis lag).
+- **Follow my tempo — click stops after 2 transcribed bars** (default): the click goes on until
+  the ABC contains 2 complete bars, then stops at the next bar line (about 1 to 2 extra bars of
+  click, because of the analysis lag).
+- **Follow my tempo — click stops after bar 2**: the click stops exactly at the end of the 2nd bar
+  (pickup excluded). The start of playing is detected from the microphone level; if you start
+  late, bars are counted from where you start.
 - **Continuous metronome, fixed tempo**: the click goes on until the end and the grid stays fixed.
 
 Tempo following uses a phase-locked loop on the note onsets found by Basic Pitch (slurred notes
@@ -144,6 +149,7 @@ js/worklet-capture.js   AudioWorkletProcessor
 js/transcriber.js       Basic Pitch on sliding windows + incremental notes
 js/quantize.js          melody, alignment, grid, pickup, durations, automatic stop
 js/tempo.js             tempo following (phase-locked loop) and start-of-playing detection
+js/cursor.js            playback cursor on the score
 js/key.js               thesession keys, spelling, detection
 js/abc.js               ABC writing (thesession style): bars + linear layout
 js/structure.js         simplification: repeats, voltas, one round
@@ -200,8 +206,13 @@ telle quelle.
    2 à 3 s de retard.
 5. L'enregistrement **s'arrête tout seul** après 2 mesures sans note (réglable : 1, 2, 4 mesures
    ou désactivé). On peut aussi cliquer sur **Arrêter**. L'ABC devient alors modifiable, et on peut :
-   - réécouter l'enregistrement, ou écouter l'ABC synthétisé ;
-   - copier l'ABC ou le télécharger en `.abc` ;
+   - écouter l'ABC synthétisé : son lecteur reste collé en haut de l'écran, quelle que soit la
+     longueur de l'ABC ;
+   - réécouter l'enregistrement (lecteur sous la partition) ;
+   - suivre l'une ou l'autre lecture sur la partition : une barre verticale indique la position en
+     cours (pour l'enregistrement, en version linéaire seulement) ;
+   - copier l'ABC (il se colle ligne par ligne dans LibreOffice Writer ou Word, et en texte brut
+     dans un éditeur de texte) ou le télécharger en `.abc` ;
    - changer la tonalité, la levée, la grille ou les seuils de détection, et l'ABC est recalculé
      sans réenregistrer ;
    - cliquer sur **Simplifier (reprises)** (voir ci-dessous) ;
@@ -217,12 +228,12 @@ Suivre un métronome sur tout un air est difficile, et les petites dérives déc
 mesure. Par défaut, le métronome ne donne donc que le départ, puis la transcription **suit le tempo
 de l'interprète** :
 
-- **Suivre mon tempo — clic arrêté après la mesure 2** (défaut) : le clic s'arrête pile à la fin de
-  la 2e mesure (hors levée). Le début de jeu est détecté d'après le niveau du micro ; si on commence
-  en retard, les mesures sont comptées à partir du début de jeu.
-- **Suivre mon tempo — clic arrêté après 2 mesures transcrites** : le clic continue jusqu'à ce que
-  l'ABC contienne 2 mesures complètes, puis s'arrête à la barre suivante (environ 1 à 2 mesures de
-  clic en plus, à cause du retard d'analyse).
+- **Suivre mon tempo — clic arrêté après 2 mesures transcrites** (défaut) : le clic continue
+  jusqu'à ce que l'ABC contienne 2 mesures complètes, puis s'arrête à la barre suivante (environ 1
+  à 2 mesures de clic en plus, à cause du retard d'analyse).
+- **Suivre mon tempo — clic arrêté après la mesure 2** : le clic s'arrête pile à la fin de la 2e
+  mesure (hors levée). Le début de jeu est détecté d'après le niveau du micro ; si on commence en
+  retard, les mesures sont comptées à partir du début de jeu.
 - **Métronome continu, tempo fixe** : le clic continue jusqu'à la fin et la grille reste fixe.
 
 Le suivi du tempo est une boucle à verrouillage de phase sur les débuts de note trouvés par Basic
@@ -306,6 +317,7 @@ js/worklet-capture.js   AudioWorkletProcessor
 js/transcriber.js       Basic Pitch en fenêtres glissantes + notes incrémentales
 js/quantize.js          mélodie, recalage, grille, levée, durées, arrêt automatique
 js/tempo.js             suivi du tempo (boucle à verrouillage de phase), détection du début de jeu
+js/cursor.js            curseur de lecture sur la partition
 js/key.js               tonalités thesession, orthographe, détection
 js/abc.js               écriture ABC (style thesession) : mesures + mise en page linéaire
 js/structure.js         simplification : reprises, voltas, un seul tour

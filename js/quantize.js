@@ -86,7 +86,7 @@ export function quantize(notes, t) {
     unitSecNow: tracker.unitSecNow, unitSecMean: tracker.unitSecMean,
     unitSecMin: tracker.unitSecMin, unitSecMax: tracker.unitSecMax, toUnits: tracker.toUnits,
   } : null;
-  if (seq.length === 0) return { events: [], pickupSteps: 0, shiftMs: Math.round(shift * 1000), noteCount: 0, tempo, origin: 0 };
+  if (seq.length === 0) return { events: [], pickupSteps: 0, shiftMs: Math.round(shift * 1000), noteCount: 0, tempo, origin: 0, toSteps };
 
   // 5. Origine de la mesure 1 et levée.
   const p0 = seq[0].pos;
@@ -126,7 +126,7 @@ export function quantize(notes, t) {
   }
   const pickupSteps = Math.max(0, -Math.min(...events.map(e => e.pos)));
   for (const e of events) e.onDownbeat = ((e.pos % t.barSteps) + t.barSteps) % t.barSteps === 0;
-  return { events, pickupSteps, shiftMs: Math.round(shift * 1000), noteCount: seq.length, tempo, origin };
+  return { events, pickupSteps, shiftMs: Math.round(shift * 1000), noteCount: seq.length, tempo, origin, toSteps };
 }
 
 function score(n) {

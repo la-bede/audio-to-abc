@@ -14,6 +14,11 @@
   <script src="vendor/abcjs/abcjs-basic-min.js"></script>
 </head>
 <body>
+  <!-- Lecteur de l'ABC synthétisé : toujours visible en haut de l'écran une fois la transcription faite. -->
+  <div id="playerBar" class="player-bar" hidden>
+    <div class="player-inner"><div id="synth" class="synth"></div></div>
+  </div>
+
   <header class="top">
     <h1>Audio <span aria-hidden="true">→</span> ABC</h1>
     <p id="status" class="status">Loading the Basic Pitch model…</p>
@@ -102,8 +107,8 @@
             </label>
             <label class="wide"><span data-i18n="f.tempoMode">Tempo mode</span>
               <select id="tempoMode">
-                <option value="track-level" selected data-i18n="f.tempoTrackLevel">Follow my tempo — click stops after bar 2</option>
-                <option value="track-abc" data-i18n="f.tempoTrackAbc">Follow my tempo — click stops after 2 transcribed bars</option>
+                <option value="track-abc" selected data-i18n="f.tempoTrackAbc">Follow my tempo — click stops after 2 transcribed bars</option>
+                <option value="track-level" data-i18n="f.tempoTrackLevel">Follow my tempo — click stops after bar 2</option>
                 <option value="fixed" data-i18n="f.tempoFixed">Continuous metronome, fixed tempo</option>
               </select>
             </label>
@@ -174,7 +179,6 @@
         </div>
         <textarea id="abcText" spellcheck="false" rows="10" wrap="off" readonly></textarea>
         <div id="paper" class="paper"></div>
-        <div id="synth" class="synth"></div>
 
         <div id="recordingBox" hidden>
           <h2 data-i18n="out.recording">Recording</h2>

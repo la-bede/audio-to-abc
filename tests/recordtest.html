@@ -56,7 +56,19 @@
 
       const $ = (id) => d.getElementById(id);
       const btn = $('recordBtn');
-      const modes = ['track-level', 'track-abc', 'fixed'];
+      log('\nMode tempo par défaut : ' + $('tempoMode').value);
+
+      // Aperçu : l'en-tête ABC suit les réglages avant l'enregistrement.
+      const header = () => $('abcText').value.trim().split('\n').filter(l => /^[RMK]:/.test(l)).join(' | ');
+      log('Aperçu initial : ' + header());
+      $('tuneType').value = 'jig'; $('tuneType').dispatchEvent(new Event('change'));
+      $('keySelect').value = '9-dorian'; $('keySelect').dispatchEvent(new Event('change'));
+      log('Aperçu après jig + Ador : ' + header());
+      $('tuneType').value = 'reel'; $('tuneType').dispatchEvent(new Event('change'));
+      $('keySelect').value = 'auto'; $('keySelect').dispatchEvent(new Event('change'));
+      log('Lecteur visible avant transcription : ' + !$('playerBar').hidden);
+
+      const modes = ['track-abc', 'track-level', 'fixed'];
       $('autoStop').value = '0'; $('autoStop').dispatchEvent(new Event('change')); // durée maîtrisée par le test
       for (let round = 1; round <= modes.length; round++) {
         $('tempoMode').value = modes[round - 1];
@@ -82,6 +94,35 @@
         log('après : ' + $('info').textContent);
         log('bouton : ' + $('recordLabel').textContent + ' | Simplifier visible : ' + !$('simplifyBtn').hidden);
         log('ABC :\n' + $('abcText').value.trim());
+        if (round === 1) {
+          // Lecteur collé en haut, même en bas de page.
+          w.scrollTo(0, d.documentElement.scrollHeight);
+          await wait(400);
+          const rect = $('playerBar').getBoundingClientRect();
+          log(`lecteur après défilement : visible=${!$('playerBar').hidden}, haut=${Math.round(rect.top)} px, hauteur=${Math.round(rect.height)} px, défilement=${Math.round(w.scrollY)} px`);
+          // Curseur pendant la lecture de l'enregistrement.
+          const audio = $('recAudio');
+          const cursorX = () => d.querySelector('#paper .abcjs-cursor')?.getAttribute('x1') ?? 'absent';
+          audio.currentTime = 3.5;
+          try { await audio.play(); } catch (e) { log('lecture audio refusée : ' + e.message); }
+          await wait(1200);
+          const x1 = cursorX();
+          await wait(1200);
+          const x2 = cursorX();
+          audio.pause();
+          await wait(200);
+          log(`curseur (enregistrement) : x=${x1} puis x=${x2} ; après pause : ${cursorX()}`);
+          // Curseur pendant la lecture de l'ABC synthétisé (police de sons chargée depuis Internet).
+          const play = d.querySelector('#synth .abcjs-midi-start');
+          if (play) {
+            play.click();
+            let seen = 'absent';
+            for (let i = 0; i < 40 && seen === 'absent'; i++) { await wait(250); seen = cursorX(); }
+            await wait(800);
+            log(`curseur (lecture ABC) : x=${seen} puis x=${cursorX()}`);
+            play.click();
+          }
+        }
         $('simplifyBtn').click();
         await wait(400);
         log('simplifié : ' + $('structureInfo').textContent + ' | bouton : ' + $('simplifyBtn').textContent);
