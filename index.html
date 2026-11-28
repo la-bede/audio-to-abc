@@ -7,31 +7,47 @@
   <meta name="theme-color" content="#1f3a34">
   <title>Audio → ABC</title>
   <link rel="stylesheet" href="vendor/abcjs/abcjs-audio.css">
-  <link rel="stylesheet" href="css/style.css?v=9">
+  <link rel="stylesheet" href="css/style.css?v=10">
   <!-- Version des fichiers (?v=…) : à incrémenter à chaque mise en ligne, pour qu'un navigateur
        ne mélange jamais une nouvelle page avec d'anciens scripts gardés en cache. -->
   <script type="importmap">
     {
       "imports": {
         "@tensorflow/tfjs": "./vendor/tfjs/tf.fesm.min.js",
-        "./js/main.js": "./js/main.js?v=9",
-        "./js/i18n.js": "./js/i18n.js?v=9",
-        "./js/tempo.js": "./js/tempo.js?v=9",
-        "./js/cursor.js": "./js/cursor.js?v=9",
-        "./js/tunetypes.js": "./js/tunetypes.js?v=9",
-        "./js/metronome.js": "./js/metronome.js?v=9",
-        "./js/recorder.js": "./js/recorder.js?v=9",
-        "./js/transcriber.js": "./js/transcriber.js?v=9",
-        "./js/quantize.js": "./js/quantize.js?v=9",
-        "./js/key.js": "./js/key.js?v=9",
-        "./js/abc.js": "./js/abc.js?v=9",
-        "./js/structure.js": "./js/structure.js?v=9"
+        "./js/main.js": "./js/main.js?v=10",
+        "./js/i18n.js": "./js/i18n.js?v=10",
+        "./js/tempo.js": "./js/tempo.js?v=10",
+        "./js/cursor.js": "./js/cursor.js?v=10",
+        "./js/tunetypes.js": "./js/tunetypes.js?v=10",
+        "./js/metronome.js": "./js/metronome.js?v=10",
+        "./js/recorder.js": "./js/recorder.js?v=10",
+        "./js/transcriber.js": "./js/transcriber.js?v=10",
+        "./js/quantize.js": "./js/quantize.js?v=10",
+        "./js/key.js": "./js/key.js?v=10",
+        "./js/abc.js": "./js/abc.js?v=10",
+        "./js/structure.js": "./js/structure.js?v=10"
       }
     }
   </script>
   <script src="vendor/abcjs/abcjs-basic-min.js"></script>
 </head>
 <body>
+  <!-- Fenêtre affichée au démarrage : l'outil n'est plus maintenu, renvoi vers Cadence. -->
+  <dialog id="deprecatedDialog" class="notice-dialog" aria-labelledby="deprecatedTitle">
+    <div class="notice-head">
+      <h2 id="deprecatedTitle" data-i18n="dep.title">This tool is no longer maintained</h2>
+      <div class="lang-switch" role="group" aria-label="Language / Langue">
+        <button type="button" class="lang" data-lang="en" lang="en">EN</button>
+        <button type="button" class="lang" data-lang="fr" lang="fr">FR</button>
+      </div>
+    </div>
+    <div data-i18n-html="dep.body"></div>
+    <form method="dialog" class="buttons">
+      <button type="submit" data-i18n="dep.close">Continue anyway</button>
+      <a class="button primary" href="https://batpapa.github.io/Cadence/" target="_blank" rel="noopener" data-i18n="dep.go">Open Cadence</a>
+    </form>
+  </dialog>
+
   <header class="top">
     <h1>Audio <span aria-hidden="true">→</span> ABC</h1>
     <p id="status" class="status">Loading the Basic Pitch model…</p>
@@ -236,6 +252,6 @@
     <div class="player-inner"><div id="synth" class="synth"></div></div>
   </div>
 
-  <script type="module" src="js/main.js?v=9"></script>
+  <script type="module" src="js/main.js?v=10"></script>
 </body>
 </html>

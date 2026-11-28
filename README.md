@@ -1,5 +1,9 @@
 # Audio → ABC
 
+> ⚠️ **No longer maintained.** Use the **Transcription** tool of [Cadence](https://batpapa.github.io/Cadence/) instead: sign in, then Modules → Transcription.
+>
+> **N'est plus maintenu.** Utilisez plutôt l'outil **Transcription** de [Cadence](https://batpapa.github.io/Cadence/) : connectez-vous, puis Modules → Transcription.
+
 [English](#english) · [Français](#français)
 
 **Live version: https://la-bede.github.io/audio-to-abc/**

@@ -112,6 +112,10 @@ for (const b of document.querySelectorAll('.lang-switch .lang')) {
 
 if (!window.isSecureContext) $('secureWarning').hidden = false;
 
+// Outil non maintenu : fenêtre de renvoi vers Cadence à chaque ouverture (Échap ou « Continuer » la ferme).
+const deprecatedDialog = $('deprecatedDialog');
+if (deprecatedDialog?.showModal) deprecatedDialog.showModal();
+
 // ---------------------------------------------------------------------------------------------
 // Réglages
 function selectBeat(value) {

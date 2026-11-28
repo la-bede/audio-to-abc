@@ -3,6 +3,10 @@
 const STORAGE_KEY = 'audio2abc.lang';
 export const LANGS = ['en', 'fr'];
 
+// Fenêtre « outil non maintenu » : lien vers Cadence et icône « Modules » de Cadence (grille de 4 carrés).
+const CADENCE = '<a href="https://batpapa.github.io/Cadence/" target="_blank" rel="noopener">Cadence</a>';
+const MODULES_ICON = '<span class="mod-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/><rect x="3" y="14" width="7" height="7" rx="1.2"/><rect x="14" y="14" width="7" height="7" rx="1.2"/></svg></span>';
+
 const DICT = {
   en: {
     'status.loading': 'Loading the Basic Pitch model…',
@@ -12,6 +16,16 @@ const DICT = {
     'status.cpu': 'CPU — slower',
     'status.failed': 'Model failed to load: {err}',
     'warn.insecure': 'This page is not served over HTTPS (nor on <code>localhost</code>): the browser will refuse microphone access.',
+
+    'dep.title': 'This tool is no longer maintained',
+    'dep.body': `<p>Audio → ABC is no longer updated. Please use the <strong>Transcription</strong> tool of ${CADENCE} instead.</p>`
+      + '<ol>'
+      + `<li>Open ${CADENCE} and <strong>sign in</strong>.</li>`
+      + `<li>Click the <strong>Modules</strong> icon ${MODULES_ICON}.</li>`
+      + '<li>Click <strong>Transcription</strong>.</li>'
+      + '</ol>',
+    'dep.go': 'Open Cadence',
+    'dep.close': 'Continue anyway',
 
     'rec.record': 'Record',
     'rec.stop': 'Stop',
@@ -147,6 +161,16 @@ const DICT = {
     'status.cpu': 'CPU — plus lent',
     'status.failed': 'Échec du chargement du modèle : {err}',
     'warn.insecure': 'Cette page n\'est pas servie en HTTPS (ni sur <code>localhost</code>) : le navigateur refusera l\'accès au micro.',
+
+    'dep.title': 'Cet outil n\'est plus maintenu',
+    'dep.body': `<p>Audio → ABC n'est plus mis à jour. Il est préférable d'utiliser l'outil <strong>Transcription</strong> de ${CADENCE}.</p>`
+      + '<ol>'
+      + `<li>Ouvrez ${CADENCE} et <strong>connectez-vous</strong>.</li>`
+      + `<li>Cliquez sur l'icône <strong>Modules</strong> ${MODULES_ICON}.</li>`
+      + '<li>Cliquez sur <strong>Transcription</strong>.</li>'
+      + '</ol>',
+    'dep.go': 'Ouvrir Cadence',
+    'dep.close': 'Continuer quand même',
 
     'rec.record': 'Enregistrer',
     'rec.stop': 'Arrêter',
