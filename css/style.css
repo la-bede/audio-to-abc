@@ -255,8 +255,7 @@ audio { width: 100%; margin: 6px 0 10px; }
 .notice-dialog .lang-switch { flex: none; }
 .notice-dialog h2 { margin: 0; font-size: 1.15rem; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .notice-dialog p { margin: 0 0 10px; }
-.notice-dialog ol { margin: 0 0 14px; padding-left: 1.4em; }
-.notice-dialog li { margin: 6px 0; }
+.notice-dialog p.hint { margin: 0 0 14px; font-size: .85rem; }
 .notice-dialog a { color: var(--accent); }
 .notice-dialog .mod-icon {
   display: inline-flex; vertical-align: -4px; padding: 2px; margin: 0 2px;

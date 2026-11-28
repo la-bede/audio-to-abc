@@ -1,8 +1,8 @@
 # Audio → ABC
 
-> ⚠️ **No longer maintained.** Use the **Transcription** tool of [Cadence](https://batpapa.github.io/Cadence/) instead: sign in, then Modules → Transcription.
+> ⚠️ **No longer maintained.** Use the [**Transcription**](https://batpapa.github.io/Cadence/Transcription/) tool of [Cadence](https://batpapa.github.io/Cadence/) instead.
 >
-> **N'est plus maintenu.** Utilisez plutôt l'outil **Transcription** de [Cadence](https://batpapa.github.io/Cadence/) : connectez-vous, puis Modules → Transcription.
+> **N'est plus maintenu.** Utilisez plutôt l'outil [**Transcription**](https://batpapa.github.io/Cadence/Transcription/) de [Cadence](https://batpapa.github.io/Cadence/).
 
 [English](#english) · [Français](#français)
 
